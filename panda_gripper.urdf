@@ -1,0 +1,50 @@
+<?xml version="1.0" ?>
+<robot name="gripper">
+  <link name="finger1">
+    <visual>
+      <origin rpy="0 0 0" xyz="0.02 0 0"/>
+      <geometry>
+        <box size="0.01 0.05 0.05"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0.02 0 0"/>
+      <geometry>
+        <box size="0.01 0.05 0.05"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.01" />
+      <origin rpy="0 0 0" xyz="0.02 0 0"/>
+      <inertia ixx="1e-4" ixy="0.0" ixz="0.0" iyy="1e-4" iyz="0.0" izz="1e-4"/>
+    </inertial>
+  </link>
+  <link name="finger2">
+    <visual>
+      <origin rpy="0 0 0" xyz="-0.02 0 0"/>
+      <geometry>
+        <box size="0.01 0.05 0.05"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="-0.02 0 0"/>
+      <geometry>
+        <box size="0.01 0.05 0.05"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.01" />
+      <origin rpy="0 0 0" xyz="-0.02 0 0"/>
+      <inertia ixx="1e-4" ixy="0.0" ixz="0.0" iyy="1e-4" iyz="0.0" izz="1e-4"/>
+    </inertial>
+  </link>
+  <joint name="finger1_joint" type="prismatic">
+    <parent link="finger1"/>
+    <child link="finger2"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="10" lower="-0.05" upper="0.05" velocity="0.2"/>
+  </joint>
+</robot>
+
+
