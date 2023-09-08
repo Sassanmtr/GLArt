@@ -11,52 +11,94 @@ from mpl_toolkits.mplot3d import Axes3D
 import random
 
 def get_meshes(obj, only_articulated = False):
-        if only_articulated == True:
-            mesh_dict, origin = obj.get_articulated_meshes()
-        if only_articulated == False:
-            mesh_dict, origin = obj.get_all_meshes()
+    """
+    Get meshes of an object.
+
+    Parameters:
+    obj: Object for which to get meshes.
+    only_articulated: Boolean, if True returns only articulated meshes, otherwise returns all meshes.
+
+    Returns:
+    transformed_meshes: List of transformed meshes.
+    """
+        
+    if only_articulated == True:
+        mesh_dict, origin = obj.get_articulated_meshes()
+    if only_articulated == False:
+        mesh_dict, origin = obj.get_all_meshes()
 
 
-        transformed_meshes = []
+    transformed_meshes = []
 
-        for key, value in mesh_dict.items():
-            for filename in value:
-                # Load the mesh
-                path = "/home/freyhe/anaconda3/lib/python3.10/site-packages/pybullet_data/"
+    for key, value in mesh_dict.items():
+        for filename in value:
+            # Load the mesh
+            path = "/home/freyhe/anaconda3/lib/python3.10/site-packages/pybullet_data/"
+            
+            loaded = tri.load_mesh(obj.get_full_path(filename))
+            
+            # If the loaded object is a Scene, dump it to get a list of Trimesh objects
+            meshes = loaded.dump() if isinstance(loaded, tri.Scene) else [loaded]
+            
+            for mesh in meshes:
+                # Create the transformation matrix
+                transform_matrix = tri.transformations.translation_matrix(origin)
                 
-                loaded = tri.load_mesh(obj.get_full_path(filename))
-                
-                # If the loaded object is a Scene, dump it to get a list of Trimesh objects
-                meshes = loaded.dump() if isinstance(loaded, tri.Scene) else [loaded]
-                
-                for mesh in meshes:
-                    # Create the transformation matrix
-                    transform_matrix = tri.transformations.translation_matrix(origin)
-                    # Apply the transformationreturn self.obj.get_articulated_bounding_boxes(
-                    #transformed_mesh = mesh.apply_transform(transform_matrix)
-                    # Add the transformed mesh to the list
-                    transformed_meshes.append(mesh)
+                transformed_meshes.append(mesh)
 
-        return transformed_meshes
+    return transformed_meshes
 
 def merge_meshes(meshes):
+    """
+    42
+    """
     return tri.util.concatenate(meshes)
 
 def get_bounding_boxes(meshes):
-        bounding_boxes = []
-        for mesh in meshes:
-            mesh = trimesh_to_o3d(mesh)
-            bounding_box = mesh.get_axis_aligned_bounding_box()
-            bounding_boxes.append(bounding_box)
-        return bounding_boxes
+    """
+    Get bounding boxes for given meshes.
+
+    Parameters:
+    meshes: List of meshes for which to get bounding boxes.
+
+    Returns:
+    bounding_boxes: List of bounding boxes.
+    """
+    bounding_boxes = []
+    for mesh in meshes:
+        mesh = trimesh_to_o3d(mesh)
+        bounding_box = mesh.get_axis_aligned_bounding_box()
+        bounding_boxes.append(bounding_box)
+    return bounding_boxes
 
 def trimesh_to_o3d(mesh):
-        mesh_o3d = o3d.geometry.TriangleMesh()
-        mesh_o3d.vertices = o3d.utility.Vector3dVector(mesh.vertices)
-        mesh_o3d.triangles = o3d.utility.Vector3iVector(mesh.faces)
-        return mesh_o3d
+    """
+    Convert a trimesh object to an open3d object.
+
+    Parameters:
+    mesh: Trimesh object to convert.
+
+    Returns:
+    mesh_o3d: Converted Open3D object.
+    """
+
+    mesh_o3d = o3d.geometry.TriangleMesh()
+    mesh_o3d.vertices = o3d.utility.Vector3dVector(mesh.vertices)
+    mesh_o3d.triangles = o3d.utility.Vector3iVector(mesh.faces)
+    return mesh_o3d
 
 def fibonacci_sphere(radius, center, samples = 100):
+    """
+    Generate points on a sphere using the Fibonacci lattice method.
+
+    Parameters:
+    radius: Radius of the sphere.
+    center: Center point of the sphere.
+    samples: Number of points to generate.
+
+    Returns:
+    points: List of points on the sphere.
+    """
     points = []
     phi = np.pi * (3. - np.sqrt(5.))  # golden angle in radians
 
@@ -74,11 +116,31 @@ def fibonacci_sphere(radius, center, samples = 100):
     return points
 
 def get_inverse(points, selection):
+    """
+    Get the inverse set of points not in the selection.
+
+    Parameters:
+    points: Total points.
+    selection: Selected points.
+
+    Returns:
+    List of points not in selection.
+    """
     # Suppose `pcd` is your point cloud and `selected_points` is your list of points
     all_indices = set(np.arange(len(points)))
     return list(all_indices - set(selection))
 
 def subdivide_mesh(mesh, max_triangle_area):
+    """
+    Subdivide a mesh until all its triangles have an area smaller than max_triangle_area.
+
+    Parameters:
+    mesh: Mesh to subdivide.
+    max_triangle_area: The maximum area a triangle is allowed to have.
+
+    Returns:
+    subdivided_mesh: Subdivided mesh.
+    """
     while np.max(mesh.area_faces) > max_triangle_area:
         faces_to_subdivide = [i for i in range(len(mesh.faces)) if mesh.area_faces[i] > max_triangle_area]
         if not faces_to_subdivide:
@@ -86,19 +148,53 @@ def subdivide_mesh(mesh, max_triangle_area):
         subdivided_mesh = mesh.subdivide(faces_to_subdivide)
         return subdivided_mesh
 
+def get_balenced_pointcloud(obj_id, number_of_points, ratio):
+    """
+    Generate a balanced point cloud for an object.
+
+    Parameters:
+    obj_id: Object ID.
+    number_of_points: Number of points in the cloud.
+    ratio: Ratio for balancing.
+
+    Returns:
+    pcd: Point cloud with balanced distribution of points.
+    """
+    samp = Sampling(obj_id, 100000)
+    pc = samp.create_balenced_cloud(ratio)
+    combined_points = pc.points
+    combined_normals = pc.normals
+    for _ in range((number_of_points // 100000)-1): #this is done because the sampling time is exponential so we just always run it for 100k and then add the points
+
+        samp = Sampling(obj_id, 100000)
+        pc = samp.create_balenced_cloud(ratio)
+        combined_points = np.vstack((combined_points, pc.points))
+        combined_normals = np.vstack((combined_normals, pc.normals))
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(combined_points)
+    pcd.normals = o3d.utility.Vector3dVector(combined_normals)
+    return pcd
+    
+
 class Sampling:
-    def __init__(self, object_number, number_of_points = 10000):
+    def __init__(self, object_number, number_of_points = 100000):
+        """
+        Initialize the Sampling object.
+        
+        Parameters:
+        object_number: Identifier for the object to be sampled.
+        number_of_points: Number of points for the point cloud.
+        """
         self.number_of_points = number_of_points
         self.object_number = object_number
         self.obj = FileParser(self.object_number)
         self.mesh_tri = merge_meshes(get_meshes(self.obj, only_articulated = False))
         self.mesh_tri = subdivide_mesh(self.mesh_tri, 0.01)
-        print("articulated triangles", len(self.mesh_tri.faces))
 
         print(len(self.mesh_tri.faces))
 
         self.mesh = trimesh_to_o3d(self.mesh_tri)
-        viewpoints = self.get_viewpoints(1000)
+        viewpoints = self.get_viewpoints(500)
 
         triangles = self.get_visible_triangles(viewpoints)
         self.visable_mesh = self.mesh_from_triangle_index(triangles)
@@ -108,18 +204,30 @@ class Sampling:
         self.visable_mesh.normalize_normals()
 
         self.pcd_cuda = self.visable_mesh.sample_points_uniformly(number_of_points, use_triangle_normal=True)
+        self.pcd = self.pcd_cuda
         self.correct_normals()
 
         self.pcd_tree = o3d.geometry.KDTreeFlann(self.pcd_cuda)
-        self.pcd_legacy = o3d.geometry.PointCloud(self.pcd_cuda)
-        self.pcd = o3d.t.geometry.PointCloud.from_legacy(self.pcd_legacy)
-        self.pcd_legacy.paint_uniform_color([1, 0, 0])
+        #self.pcd_legacy = o3d.geometry.PointCloud(self.pcd_cuda)
+        #self.pcd = o3d.t.geometry.PointCloud.from_legacy(self.pcd_legacy)
+        #self.pcd_legacy.paint_uniform_color([0, 1, 1])
 
 
 # Usage:
 
 
     def get_nearest_points(self, number_of_nearest_points,radius, point):
+        """
+        Get the nearest points within a given radius around a point.
+        
+        Parameters:
+        number_of_nearest_points: The number of closest points to find.
+        radius: Search radius.
+        point: Reference point.
+        
+        Returns:
+        List of indices of nearest points.
+        """
         print("point", point)
         [k, idx, _] = self.pcd_tree.search_radius_vector_3d(self.pcd_cuda.points[point], radius)
         if len(idx) < number_of_nearest_points:
@@ -127,11 +235,28 @@ class Sampling:
         return rand.sample(list(idx), number_of_nearest_points-1)
     
     def paint(self, points, color):
+        """
+        Paint specified points in the point cloud with a given color.
+        
+        Parameters:
+        points: List of point indices to paint.
+        color: The color to paint the points.
+        """
         print(points)
         print(len(points))
         np.asarray(self.pcd_legacy.colors)[list(points), :] = color
     
     def is_potentially_grippable(self, point, points):
+        """
+        Check if a point is potentially grippable based on its neighboring points.
+        
+        Parameters:
+        point: The index of the point to check.
+        points: List of indices of neighboring points.
+        
+        Returns:
+        Boolean indicating if the point is potentially grippable.
+        """
         # Assume initially that the surface is not an edge
         accessible = False
         antipodal = False
@@ -149,7 +274,7 @@ class Sampling:
             angle = np.degrees(np.arccos(np.clip(np.dot(normals[i], normal), -1.0, 1.0)))
 
             # If the angle is 90 degrees or more, the point is on an edge
-            if angle >= 45 and angle <= 135:  # between 45 and 135 degrees
+            if angle >= 60 and angle <= 120:  # between 60 and 120 degrees
                 for j in range(len(normals)):
                     angle = np.degrees(np.arccos(np.clip(np.dot(normals[i], normals[j]), -1.0, 1.0)))
                     if angle >= 150: # more than 150 degrees
@@ -159,11 +284,20 @@ class Sampling:
         return False
             
     def get_edges(self, point_index):
+        """
+        Get the edges of the mesh based on the point cloud.
+        
+        Parameters:
+        point_index: List of point indices to consider.
+        
+        Returns:
+        Unique set of edge points.
+        """
         edges = []
         edges_unique = set()
         for index in point_index:
             if index not in edges:
-                neighbors = self.get_nearest_points(9, 0.04, index)
+                neighbors = self.get_nearest_points(6, 0.04, index)
                 
                 if self.is_potentially_grippable(index, neighbors):
 
@@ -173,7 +307,16 @@ class Sampling:
         return edges_unique
     
     def get_points_in_boxes(self, bounding_boxes: list, points: list):
-
+        """
+        Get the points that are within specified bounding boxes.
+        
+        Parameters:
+        bounding_boxes: List of bounding boxes.
+        points: List of points to consider.
+        
+        Returns:
+        Set of points within the bounding boxes.
+        """
         points = set()
         for bounding_box in bounding_boxes:
 
@@ -181,16 +324,32 @@ class Sampling:
         return points
 
     def get_articulated_points(self):
+        """
+        Get the points that are part of articulated components.
+        
+        Returns:
+        Set of articulated points.
+        """
         boxes = self.get_articulated_bounding_boxes()
         print("boxes", boxes)
         return self.get_points_in_boxes(boxes, self.pcd_cuda.points)
     
     def get_articulated_bounding_boxes(self):
+        """
+        Get the bounding boxes of articulated components.
+        
+        Returns:
+        List of bounding boxes for articulated components.
+        """
         meshes = get_meshes(self.obj, only_articulated = True)
         print("meshes", len(meshes))
         return get_bounding_boxes(meshes)
     
     def make_mesh_double_sided(self):
+        """
+        Make the mesh double-sided by reversing the order of vertices for each triangle, therefor making sure there is a triangle normal pointing in each direction.
+        This was only for visualization since some triangles were not visualized due to this issue
+        """
         # Create a new mesh and set its vertices and triangles to be the same as the original mesh
         mesh_double_sided = o3d.cuda.pybind.geometry.TriangleMesh()
         mesh_double_sided.vertices = self.mesh.vertices
@@ -216,6 +375,16 @@ class Sampling:
         return center, radius*1.3
 
     def get_visible_triangles(self, viewpoints, batchsize=10000):
+        """
+        Get the visible triangles from multiple viewpoints.
+        
+        Parameters:
+        viewpoints: A list of points representing the viewpoints.
+        batchsize: The number of triangles to process in each batch.
+        
+        Returns:
+        A set of visible triangle indices.
+        """
         # Convert the viewpoints to a numpy array if they're not already
         viewpoints = np.array(viewpoints)
 
@@ -280,7 +449,15 @@ class Sampling:
         return visible_triangles
 
     def mesh_from_triangle_index(self, triangle_index):
-
+        """
+        Create a new mesh containing only the triangles specified by their indices.
+        
+        Parameters:
+        triangle_index: A set or list of triangle indices.
+        
+        Returns:
+        A new mesh containing only the specified triangles.
+        """
         indices = np.array(list(triangle_index))
         indices = indices[indices != 4294967295] # invalid id tag
 
@@ -290,11 +467,26 @@ class Sampling:
         return new_mesh
 
     def mesh_from_triangle_index_tri(self, triangle_index):
+        """
+        Create a new Trimesh containing only the triangles specified by their indices.
+        
+        Parameters:
+        triangle_index: A set or list of triangle indices.
+        
+        Returns:
+        A new Trimesh containing only the specified triangles.
+        """
         indices = list(triangle_index)
         new_mesh = tri.Trimesh(vertices=self.mesh_tri.vertices, faces=self.mesh_tri.faces[indices])
         return new_mesh
 
     def sample_visable_points(self):
+        """
+        Sample points that are visible from a set of viewpoints.
+        
+        Returns:
+        A PointCloud object containing the sampled points.
+        """
         center, radius = self.bounding_sphere()
         boxes = self.get_articulated_bounding_boxes()
         number_of_boxes = len(boxes)
@@ -308,6 +500,9 @@ class Sampling:
         return pcd_cuda
        
     def visualize_mesh_and_bounding_boxes(self):
+        """
+        Visualize the mesh along with its articulated bounding boxes.
+        """
         geometries = [self.mesh]
         bounding_boxes = self.get_articulated_bounding_boxes()
         for bbox in bounding_boxes:
@@ -317,6 +512,15 @@ class Sampling:
         o3d.visualization.draw_geometries(geometries)
 
     def get_viewpoints(self, number_of_viewpoints):
+        """
+        Generate a set of viewpoints around the object.
+        
+        Parameters:
+        number_of_viewpoints: The number of viewpoints to generate.
+        
+        Returns:
+        A list of generated viewpoints.
+        """
         center, radius = self.bounding_sphere()
         viewpoints = fibonacci_sphere(radius=radius, center=center, samples = number_of_viewpoints)
         return viewpoints
@@ -324,6 +528,15 @@ class Sampling:
     def create_balenced_cloud(self, ratio):             #the ratio stems from the antipodal points. It is assumed you want all antipodal points and then it samples based on the number of antipodal points
         #ratio relative to antipodal points
         # Get the points in each category
+        """
+        Create a balanced point cloud based on the ratio of articulated to unarticulated points.
+        
+        Parameters:
+        ratio: Tuple containing the ratio of unarticulated to articulated points.
+        
+        Returns:
+        A new point cloud containing the balanced set of points.
+        """
         articulated_points = self.get_articulated_points()
 
         unarticulated_points = get_inverse(self.pcd_cuda.points, articulated_points)
@@ -336,7 +549,7 @@ class Sampling:
         # Calculate remaining points and ratios
         num_unarticulated = round(ratio[0] * num_antipodal)
         num_articulated = round(ratio[1] * num_antipodal)
-        print("num articulated", num_unarticulated)
+        print("num astart_timerticulated", num_unarticulated)
         # Randomly select points from each category
         selected_unarticulated = random.sample(list(unarticulated_points), num_unarticulated)
         selected_articulated = random.sample(list(articulated_points), num_articulated)
@@ -357,6 +570,10 @@ class Sampling:
         return new_point_cloud
 
     def correct_normals(self):
+        """
+        Correct the normals of the point cloud based on the underlying mesh.
+        Correcting by shooting a ray from the current point and normal and if there are an even number of intersections the normal is flipped.
+        """
         # Get the points and normals from the pointcloud
         start_time = time.time()
         points = np.asarray(self.pcd_cuda.points)
@@ -380,6 +597,12 @@ class Sampling:
         print(f"Ray tracing took {end_time - start_time} seconds.")
 
     def check_collision(self, points):
+        """
+        Check for collisions of rays emanating from specified points.
+        
+        Parameters:
+        points: List of points from which rays will be cast.
+        """
         scene = o3d.t.geometry.RaycastingScene()
         mesh = o3d.t.geometry.TriangleMesh.from_legacy(self.mesh)
         position = np.asarray(self.pcd_cuda.points)[points]
@@ -393,22 +616,51 @@ class Sampling:
         ans = scene.cast_rays(rays)
 
         print(ans.keys())
-
-"""samp = Sampling(11661, 10000)
-
-
-pc_1 = samp.create_balenced_cloud([0.1, 0.2])
-o3d.visualization.draw_geometries([pc_1], point_show_normal=True)
 """
+start_time = time.time()
 
 
+
+
+
+start_time = time.time()
+samp = Sampling(7167, 100000)
+#pc = samp.create_balenced_cloud([0, 0])
+#o3d.visualization.draw_geometries([samp.pcd_legacy, samp.mesh], point_show_normal=False)
+articulated = samp.get_articulated_points()
+print("articulated", len(articulated))
+#pc_articulated = o3d.geometry.PointCloud()
+#pc_articulated = samp.pcd_cuda.select_by_index(list(articulated))
+#pc_articulated.paint_uniform_color([0, 1, 1])
+#o3d.visualization.draw_geometries([pc_articulated, samp.mesh], point_show_normal=False)
+edges = samp.get_edges(articulated)
+print("edges", len(edges))
+end_time = time.time()
+print(f"graspable sampling took {end_time - start_time} seconds.")
+#pc_edges = o3d.geometry.PointCloud()
+pc_edges = samp.pcd_cuda.select_by_index(list(edges))
+pc_edges.paint_uniform_color([0, 1, 1])
+o3d.visualization.draw_geometries([pc_edges, samp.mesh], point_show_normal=False)
+#o3d.visualization.draw_geometries([samp.pcd_legacy, samp.mesh], point_show_normal=False)
+
+#o3d.visualization.draw_geometries([samp.pcd_legacy, samp.mesh] ,point_show_normal=False)
+
+#o3d.io.write_point_cloud("44781_articulated_edges_example.pcd", samp.pcd_legacy)
+"""
 
 """             
 start_time = time.time()
-pc = Sampling(11661, number_of_points=100000)
+pc = Sampling(44781, number_of_points=100000)
+pc.get
+
+articulated = pc.get_articulated_points()
+edges = pc.get_edges(articulated)
+pc.paint(articulated, [0, 0, 1])
+pc.paint(edges, [0, 1, 0])
 
 pc.visualize_mesh_and_bounding_boxes()
 edges = pc.get_edges(pc.get_articulated_points())
+
 #pc.check_collision(edges)
 print("number of articulated", len(edges))
 pc.paint(edges, [0, 1, 0])
