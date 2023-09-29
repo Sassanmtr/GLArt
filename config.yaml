@@ -1,0 +1,6 @@
+GripperSpinningFriction: [10, 100]
+ObjectSpinningFriction: [10, 100]
+GripperLateralFriction: [10, 100]
+ObjectLateralFriction: [10, 100]
+ObjectMass: [0.5, 1]
+GripperMass: [1, 200]

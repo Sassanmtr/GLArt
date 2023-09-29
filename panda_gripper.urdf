@@ -1,50 +1,70 @@
-<?xml version="1.0" ?>
-<robot name="gripper">
-  <link name="finger1">
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="panda_gripper" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <link name="panda_hand">
     <visual>
-      <origin rpy="0 0 0" xyz="0.02 0 0"/>
-      <geometry>
-        <box size="0.01 0.05 0.05"/>
-      </geometry>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0.02 0 0"/>
-      <geometry>
-        <box size="0.01 0.05 0.05"/>
-      </geometry>
-    </collision>
-    <inertial>
-      <mass value="0.01" />
-      <origin rpy="0 0 0" xyz="0.02 0 0"/>
-      <inertia ixx="1e-4" ixy="0.0" ixz="0.0" iyy="1e-4" iyz="0.0" izz="1e-4"/>
-    </inertial>
-  </link>
-  <link name="finger2">
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.02 0 0"/>
-      <geometry>
-        <box size="0.01 0.05 0.05"/>
-      </geometry>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="-0.02 0 0"/>
-      <geometry>
-        <box size="0.01 0.05 0.05"/>
-      </geometry>
-    </collision>
-    <inertial>
-      <mass value="0.01" />
-      <origin rpy="0 0 0" xyz="-0.02 0 0"/>
-      <inertia ixx="1e-4" ixy="0.0" ixz="0.0" iyy="1e-4" iyz="0.0" izz="1e-4"/>
-    </inertial>
-  </link>
-  <joint name="finger1_joint" type="prismatic">
-    <parent link="finger1"/>
-    <child link="finger2"/>
-    <origin rpy="0 0 0" xyz="0 0 0"/>
-    <axis xyz="0 1 0"/>
-    <limit effort="10" lower="-0.05" upper="0.05" velocity="0.2"/>
-  </joint>
-</robot>
 
+      <geometry>
+        <mesh filename="franka_description/meshes/visual/hand.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="franka_description/meshes/collision/hand.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="panda_leftfinger">
+    <visual>
+      <geometry>
+        <mesh filename="franka_description/meshes/visual/finger.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="franka_description/meshes/collision/finger.stl"/>
+      </geometry>
+      <contact>
+        <lateral_friction value="30.0"/>
+        <rolling_friction value="1"/>
+        <spinning_friction value="1"/>
+      </contact>
+    </collision>
+  </link>
+  <link name="panda_rightfinger">
+    <visual>
+      <origin rpy="0 0 3.14159265359" xyz="0 0 0"/>
+      <geometry>       
+        <mesh filename="franka_description/meshes/visual/finger.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 3.14159265359" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="franka_description/meshes/collision/finger.stl"/>
+      </geometry>
+      <contact>
+        <lateral_friction value="30.0"/>
+        <rolling_friction value="1"/>
+        <spinning_friction value="1"/>
+      </contact>
+    </collision>
+  </link>
+  <joint name="panda_finger_joint1" type="prismatic">
+    <parent link="panda_hand"/>
+    <child link="panda_leftfinger"/>
+    <origin rpy="0 0 0" xyz="0 0 0.0584"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="20" lower="0.0" upper="0.04" velocity="0.2"/>
+  </joint>
+  <joint name="panda_finger_joint2" type="prismatic">
+    <parent link="panda_hand"/>
+    <child link="panda_rightfinger"/>
+    <origin rpy="0 0 0" xyz="0 0 0.0584"/>
+    <axis xyz="0 -1 0"/>
+    <limit effort="20" lower="0.0" upper="0.04" velocity="0.2"/>
+    <mimic joint="panda_finger_joint1"/>
+  </joint>
+
+
+</robot>
 

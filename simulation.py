@@ -2,9 +2,7 @@ import time
 import pybullet as p
 import sim_env
 from object_info import Object
-
-
-
+import pybullet_data
 
 
 def run_simulation(gripper, object_id, steps=10000, sleep=1/1000, open = True):
@@ -70,5 +68,4 @@ def run_simulation(gripper, object_id, steps=10000, sleep=1/1000, open = True):
 
     
     return object.success(gripper)
-
-    
+  

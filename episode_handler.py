@@ -2,9 +2,13 @@ from simulation import run_simulation
 from loader import load_assets
 from sim_env import setup_env, setup_physics_client
 import time
-from sampling import Sampling, get_balenced_pointcloud
+import os
+from sampling import Sampling, get_balanced_pointcloud
 import random
 import numpy as np
+import yaml
+import itertools
+import pickle
 from helper import quaternion_from_vectors, calc_forward_vec, transform_open3d_to_pybullet_pointcloud, transform_open3d_to_pybullet, vector_to_euler, change_quaternion_format_to_xyz_w, give_quaternion_roll
 from file_parser import FileParser
 from scipy.spatial.transform import Rotation
@@ -13,96 +17,186 @@ import json
 import gc
 import cProfile
 import pybullet as p
+import pybullet_data
 
-def run(gripper_start_position, gripper_start_orientation, object_number, center_of_object, balenced_cloud):
+# fix the seed for HPO
+random.seed(42)
+np.random.seed(42)
+
+
+def run(param_config, data_dir, assets_dir, gripper_start_position, gripper_start_orientation, object_number, center_of_object, balanced_cloud, scale):
     setup_env(start_position_camera = gripper_start_position)
 
-    gripper, object_id = load_assets(gripper_start_position, gripper_start_orientation, object_number, center_of_object, balenced_cloud )
+    gripper, object_id = load_assets(param_config, data_dir, assets_dir, gripper_start_position, gripper_start_orientation, object_number, center_of_object, balanced_cloud, scale)
      
     result = run_simulation(gripper, object_id, steps = 6000000, sleep = 1/1000)
 
     return result
 
-def main(object_number, number_of_episodes, number_of_points):
+def main(config, data_dir, assets_dir, object_number, number_of_episodes, number_of_points, scale):
     setup_physics_client()
     points_success = []
-    """point_cloud = Sampling(object_number, number_of_points=60000)"""
+    """point_cloud = Sampling(data_dir, object_number, number_of_points=60000)"""
     
-    balenced_cloud = get_balenced_pointcloud(object_number, number_of_points, [0.0,0.0])
-    #o3d.visualization.draw_geometries([balenced_cloud], point_show_normal=True)
-    obj = FileParser(object_number)
+    balanced_cloud = get_balanced_pointcloud(data_dir, object_number, scale, number_of_points, [0, 0])
+    o3d.visualization.draw_geometries([balanced_cloud], point_show_normal=True)
+    obj = FileParser(data_dir, object_number)
     center_of_object = obj.get_center_of_object()
     center_of_object = transform_open3d_to_pybullet(center_of_object)
 
     print("COM", center_of_object)
-    balenced_points = transform_open3d_to_pybullet_pointcloud(balenced_cloud.points)
-    balenced_normals = transform_open3d_to_pybullet_pointcloud(balenced_cloud.normals)
+    balanced_points = transform_open3d_to_pybullet_pointcloud(balanced_cloud.points)
+    balanced_normals = transform_open3d_to_pybullet_pointcloud(balanced_cloud.normals)
+    result_dict = {}
+    points = list(range(len(balanced_points)))
+    if len(points) < number_of_episodes: #check that there are enough graspable points for the amount of episodes chosen
+
+        raise ValueError("Only " + str(len(points)) + " points available, but " + str(number_of_episodes) + " are needed. Increase the point cloud size or decrease the number of episodes.")
+
+
+    
+    # Extract parameter ranges from the config
+    param_ranges = {
+        'GripperSpinningFriction': config['GripperSpinningFriction'],
+        'ObjectSpinningFriction': config['ObjectSpinningFriction'],
+        'GripperLateralFriction': config['GripperLateralFriction'],
+        'ObjectLateralFriction': config['ObjectLateralFriction'],
+        'ObjectMass': config['ObjectMass'],
+        'GripperMass': config['GripperMass'],
+    }
+    
+    # Define the predefined values for ObjectCollisionMargin and GripperCollisionMargin
+    num_samples = 50  # Number of random samples you want to test
+
+    random_configurations = []
+
+    for _ in range(num_samples):
+        config_dict = {}
+        for param_name, param_range in param_ranges.items():
+            if param_name in ['ObjectMass']:
+                # Randomly sample from the predefined object mass values
+                sampled_value = random.uniform(0.5, 0.5)
+            else:
+                # Assuming a range [min, max] for integer values
+                sampled_value = random.randint(param_range[0], param_range[1])
+            config_dict[param_name] = sampled_value
+
+        random_configurations.append(config_dict)
 
     result_dict = {}
-    points = list(range(len(balenced_points)))
-    if len(points) < number_of_episodes: #check that there are enough graspable points for the amount of episodes chosen
-        dummy = o3d.geometry.PointCloud()
-        for _ in range(666):
-            dummy.points.append([0,0,0])
-        return dummy
-        raise ValueError("Only " + str(len(points)) + " points available, but " + str(number_of_episodes) + " are needed. Increase the point cloud size or decrease the number of episodes.")
-    #run the actual episode
+    final_dict = {}
+    for config_dict in random_configurations:
+        print("Testing configuration dictionary:", config_dict)
+        #run the actual episode
+        new_points = points.copy()
+        for episode in range(number_of_episodes):
+            #random roll for the gripper
+            # angle = random.uniform(-np.pi, np.pi)
+            angle = 0.0
+            print("episode: ", episode)
+            #choose a random point
+            point_index = np.random.choice(new_points)
+            new_points.remove(point_index)
+            #retrieve gripper trajectory and point
+            point = balanced_points[point_index]
+            normal = balanced_normals[point_index]
+            normal = (-1.0, 0.0, 0.0)
+            gripper_start_orientation = give_quaternion_roll(change_quaternion_format_to_xyz_w(quaternion_from_vectors([0,0,-1], normal)), angle)#TODO dont use random angle
+            #the actual gripper starting position is by determined by taking the point in the object and then calculating the backwords trajectory
+            gripper_start_position = calc_forward_vec(point, gripper_start_orientation, -0.12)
+
+            """if episode > 0:
+                cProfile("run(gripper_start_position, gripper_start_orientation, object_number, center_of_object, point)", sort="cumtime").print_stats"""
+            result = run(config_dict, data_dir, assets_dir, gripper_start_position, gripper_start_orientation, object_number, center_of_object, point, scale)
+            p.resetSimulation()
+            if result == "Success" :#or result == "Partial success"
+                
+                result_dict[int(point_index)] = [gripper_start_position, gripper_start_orientation]
+                points_success.append(point_index)
+            #o3d.visualization.draw_geometries([balanced_cloud, point_cloud.mesh], point_show_normal=True)
+            gc.collect()
+        success_count = len(points_success)
+        final_dict[config_dict] = success_count
+    with open("my_dict.pkl", "wb") as pickle_file:
+        pickle.dump(final_dict, pickle_file)
+    # # Convert NumPy arrays to lists recursively
+    # result_dict_serializable = convert_to_serializable(result_dict)
+
+    # # Specify the file path where you want to save the dictionary
+    # file_path = "result_dict.json"
+
+    # # Write the dictionary to the file
+    # with open(file_path, "w") as json_file:
+    #     json.dump(result_dict_serializable, json_file)
+
+    # print("Dictionary saved to", file_path)
+    # print(result_dict)
+    # pc_new = o3d.geometry.PointCloud()
+    # for index in points_success:
+    #     point = balanced_cloud.points[index]
+    #     normal = balanced_cloud.normals[index]
+    #     pc_new.points.append(point)
+    #     pc_new.normals.append(normal)
+    # #o3d.visualization.draw_geometries([pc_new], point_show_normal=True)
+    # return pc_new
+    
+def precompute_pointcloud(data_dir, save_dir, joint_state, scale, object_name, number_of_points, ratio):
+    setup_physics_client()
+    balanced_cloud = get_balanced_pointcloud(data_dir, object_name, scale, number_of_points, ratio)
+    o3d.visualization.draw_geometries([balanced_cloud], point_show_normal=True)
+    obj = FileParser(data_dir, object_name)
+    center_of_object = obj.get_center_of_object()
+    center_of_object = transform_open3d_to_pybullet(center_of_object)
+    balanced_points = transform_open3d_to_pybullet_pointcloud(balanced_cloud.points)
+    balanced_normals = transform_open3d_to_pybullet_pointcloud(balanced_cloud.normals)
+    points = list(range(len(balanced_points)))
+    data_dict = {
+        'balanced_points': balanced_points,
+        'balanced_normals': balanced_normals,
+        'points': points,
+        'center_of_object': center_of_object
+    }
+    np.savez(os.path.join(save_dir, f'{object_name}_{scale}_{joint_state}.npz'), **data_dict)
+    return os.path.join(save_dir, f'{object_name}_{scale}_{joint_state}.npz')
+
+
+def precomputed_main(config_dict, pointcloud_path, object_name, scale, joint_state, number_of_episodes):
+    setup_physics_client()
+    points_success = []
+    result_dict = {}
+    # Load the data from the .npz file
+    loaded_data = np.load(pointcloud_path, allow_pickle=True)
+    # Access individual arrays by their keys
+    balanced_points = loaded_data['balanced_points']
+    balanced_normals = loaded_data['balanced_normals']
+    points = list(loaded_data['points'])
+    center_of_object = loaded_data['center_of_object']
     for episode in range(number_of_episodes):
-        start_time = time.time()
         #random roll for the gripper
-        angle = random.uniform(-np.pi, np.pi)
+        # angle = random.uniform(-np.pi, np.pi)
+        angle = joint_state
         print("episode: ", episode)
         #choose a random point
         point_index = np.random.choice(points)
         points.remove(point_index)
         #retrieve gripper trajectory and point
-        point = balenced_points[point_index]
-        print("normal: ", balenced_normals[point_index])
-        normal = balenced_points[point_index]
-        
-        gripper_start_orientation = give_quaternion_roll(change_quaternion_format_to_xyz_w(quaternion_from_vectors([0,0,-1], normal)), angle)#TODO dont use random angle
+        point = balanced_points[point_index]
+        normal = balanced_normals[point_index]
+        normal = (-1.0, 0.0, 0.0)
+        gripper_start_orientation = give_quaternion_roll(change_quaternion_format_to_xyz_w(quaternion_from_vectors([0,0,-1], normal)), angle)
         #the actual gripper starting position is by determined by taking the point in the object and then calculating the backwords trajectory
         gripper_start_position = calc_forward_vec(point, gripper_start_orientation, -0.12)
 
         """if episode > 0:
             cProfile("run(gripper_start_position, gripper_start_orientation, object_number, center_of_object, point)", sort="cumtime").print_stats"""
-        result = run(gripper_start_position, gripper_start_orientation, object_number, center_of_object, point)
+        result = run(config_dict, data_dir, assets_dir, gripper_start_position, gripper_start_orientation, object_name, center_of_object, point, scale)
         p.resetSimulation()
-        print("result: ", result)
-        print("gripper_start_position: ", gripper_start_position)
-        print("gripper_start_orientation: ", gripper_start_orientation)
         if result == "Success" :#or result == "Partial success"
-            
             result_dict[int(point_index)] = [gripper_start_position, gripper_start_orientation]
             points_success.append(point_index)
-        #o3d.visualization.draw_geometries([balenced_cloud, point_cloud.mesh], point_show_normal=True)
-
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(f"The code took {execution_time} seconds to complete.")
+        #o3d.visualization.draw_geometries([balanced_cloud, point_cloud.mesh], point_show_normal=True)
         gc.collect()
-    # Convert NumPy arrays to lists recursively
-    result_dict_serializable = convert_to_serializable(result_dict)
-
-    # Specify the file path where you want to save the dictionary
-    file_path = "result_dict.json"
-
-    # Write the dictionary to the file
-    with open(file_path, "w") as json_file:
-        json.dump(result_dict_serializable, json_file)
-
-    print("Dictionary saved to", file_path)
-    print(result_dict)
-    pc_new = o3d.geometry.PointCloud()
-    for index in points_success:
-        point = balenced_cloud.points[index]
-        normal = balenced_cloud.normals[index]
-        pc_new.points.append(point)
-        pc_new.normals.append(normal)
-    #o3d.visualization.draw_geometries([pc_new], point_show_normal=True)
-    return pc_new
-    
-
+    print("Number of successful grasps: ", len(points_success))
 
 def convert_to_serializable(obj):
     if isinstance(obj, np.ndarray):
@@ -115,16 +209,24 @@ def convert_to_serializable(obj):
         return obj
 
 if __name__ == "__main__":
-    numbers  = [10068, 10144, 10373, 10489, 10586, 10612, 10751, 10655, 10627, 10638, 10849, 10867, 10900, 10944, 11178, 12055,12059,10905, 11211, 11231, 11299, 11304, 11550, 11709, 12043, 12042, 11846, 12036, 12038, 12066, 12055, 12059, 12054, 12248, 12249, 12250, 12252]
+    # Initialize the PyBullet GUI mode and configure the visualizer
+    p.connect(p.GUI)
+    p.setAdditionalSearchPath(pybullet_data.getDataPath())
+    p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
+    # End of initialization
+    numbers  = [7310]
+    data_dir = "/home/mokhtars/Documents/Thesis/datasets/others/CatData/Microwave/"
+    assets_dir = "/home/mokhtars/Documents/articulatedobjectsgraspsampling/"
     out = []
-    start_time = time.time()
-    for number in numbers:
-        cloud = main(object_number = number, number_of_episodes=100, number_of_points=100000)
-        out.append(f"{number} has {len(cloud.points)} points")
+    config_path = "/home/mokhtars/Documents/articulatedobjectsgraspsampling/test_config.yaml"
+    with open(config_path, 'r') as f:
+        config_data = yaml.safe_load(f)
+    
+    # pointcloud_path = precompute_pointcloud(data_dir=data_dir, save_dir=assets_dir, joint_state=0.0, scale=0.3, object_name=7310, number_of_points=100000, ratio=[0,0])
+    # pointcloud_path = '/home/mokhtars/Documents/articulatedobjectsgraspsampling/7310_0.3_0.0.npz'
+    # precomputed_main(config_data, pointcloud_path, object_name=7310, scale=0.3, joint_state=0.0, number_of_episodes=1000)
+    # for number in numbers:
+    #     cloud = main(config=config_data, data_dir=data_dir, assets_dir=assets_dir, object_number = number, number_of_episodes=1000, number_of_points=100000, scale=0.3)    
+    #     out.append(f"{number} has {len(cloud.points)} points")
 
-
-        end_time = time.time()
-
-        print(out)
-    execution_time = end_time - start_time
-    print(f"The code took {execution_time} seconds to complete.")
+    p.disconnect()

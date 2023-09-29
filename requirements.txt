@@ -1,0 +1,8 @@
+numpy
+pybullet
+scipy
+open3d
+trimesh
+pyglet
+Rtree
+git+https://github.com/chisarie/urdfpy

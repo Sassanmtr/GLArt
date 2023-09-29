@@ -9,8 +9,44 @@ import time
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import random
+import urdfpy
 
-def get_meshes(obj, only_articulated = False):
+def load_and_transform_mesh(mesh_filename, origin, scale):
+    loaded_mesh = load_mesh(mesh_filename)
+    loaded_mesh.apply_scale(scale)
+    apply_origin_transform(loaded_mesh, origin)
+    return loaded_mesh
+
+    return None  # Placeholder, replace with actual implementation
+
+def load_urdf_meshes(urdf_file_path, scale=1.0, only_articulated=False):
+    # Load the URDF robot model
+    arti_obj = urdfpy.URDF.load(urdf_file_path)
+
+    transformed_meshes = []
+
+    for link_name, link in arti_obj.links.items():
+        # Check if only articulated meshes are requested
+        if only_articulated and link_name not in arti_obj.active_links:
+            continue
+
+        for visual in link.visuals:
+            origin = visual.origin
+            mesh_filename = visual.geometry.mesh.filename
+
+            # Load and transform the mesh
+            # You would need to implement the actual loading and transformation logic here
+            # Example: Load the mesh and apply the scale
+            transformed_mesh = load_and_transform_mesh(mesh_filename, origin, scale)
+
+            if transformed_mesh is not None:
+                transformed_meshes.append(transformed_mesh)
+
+    return transformed_meshes
+
+
+
+def get_meshes(obj, scale, only_articulated = False):
     """
     Get meshes of an object.
 
@@ -21,29 +57,26 @@ def get_meshes(obj, only_articulated = False):
     Returns:
     transformed_meshes: List of transformed meshes.
     """
-        
+
     if only_articulated == True:
         mesh_dict, origin = obj.get_articulated_meshes()
     if only_articulated == False:
         mesh_dict, origin = obj.get_all_meshes()
-
+    
+    # articulated_links = [i for i in obj.get_articulated_meshes()[0].values()][0]
 
     transformed_meshes = []
 
     for key, value in mesh_dict.items():
         for filename in value:
             # Load the mesh
-            path = "/home/freyhe/anaconda3/lib/python3.10/site-packages/pybullet_data/"
-            
             loaded = tri.load_mesh(obj.get_full_path(filename))
             
             # If the loaded object is a Scene, dump it to get a list of Trimesh objects
             meshes = loaded.dump() if isinstance(loaded, tri.Scene) else [loaded]
             
             for mesh in meshes:
-                # Create the transformation matrix
-                transform_matrix = tri.transformations.translation_matrix(origin)
-                
+                mesh.apply_scale(scale)
                 transformed_meshes.append(mesh)
 
     return transformed_meshes
@@ -145,29 +178,29 @@ def subdivide_mesh(mesh, max_triangle_area):
         faces_to_subdivide = [i for i in range(len(mesh.faces)) if mesh.area_faces[i] > max_triangle_area]
         if not faces_to_subdivide:
             break  # Exit the loop if no faces left to subdivide
-        subdivided_mesh = mesh.subdivide(faces_to_subdivide)
-        return subdivided_mesh
+        mesh = mesh.subdivide(faces_to_subdivide)
+    return mesh
 
-def get_balenced_pointcloud(obj_id, number_of_points, ratio):
+def get_balanced_pointcloud(data_dir, obj_id, scale, number_of_points, ratio):
     """
     Generate a balanced point cloud for an object.
 
     Parameters:
     obj_id: Object ID.
     number_of_points: Number of points in the cloud.
-    ratio: Ratio for balancing.
+    ratio: Ratio for how many uniformally, movable points you want compared to the initial graspable points etc 500 graspable points detected and ratio 0.5,0.4 so the resulting pointcloud is 250 uniform points 200 movable points and it is assumed you always want all graspable so 500 graspable 
 
     Returns:
     pcd: Point cloud with balanced distribution of points.
     """
-    samp = Sampling(obj_id, 100000)
-    pc = samp.create_balenced_cloud(ratio)
+    samp = Sampling(data_dir, obj_id, scale, 100000)
+    pc = samp.create_balanced_cloud(ratio)
     combined_points = pc.points
     combined_normals = pc.normals
     for _ in range((number_of_points // 100000)-1): #this is done because the sampling time is exponential so we just always run it for 100k and then add the points
 
-        samp = Sampling(obj_id, 100000)
-        pc = samp.create_balenced_cloud(ratio)
+        samp = Sampling(data_dir, obj_id, scale, 100000)
+        pc = samp.create_balanced_cloud(ratio)
         combined_points = np.vstack((combined_points, pc.points))
         combined_normals = np.vstack((combined_normals, pc.normals))
     pcd = o3d.geometry.PointCloud()
@@ -177,7 +210,7 @@ def get_balenced_pointcloud(obj_id, number_of_points, ratio):
     
 
 class Sampling:
-    def __init__(self, object_number, number_of_points = 100000):
+    def __init__(self, data_dir, object_number, scale, number_of_points = 100000):
         """
         Initialize the Sampling object.
         
@@ -187,8 +220,10 @@ class Sampling:
         """
         self.number_of_points = number_of_points
         self.object_number = object_number
-        self.obj = FileParser(self.object_number)
-        self.mesh_tri = merge_meshes(get_meshes(self.obj, only_articulated = False))
+        self.data_dir = data_dir
+        self.scale = scale
+        self.obj = FileParser(self.data_dir, self.object_number)
+        self.mesh_tri = merge_meshes(get_meshes(self.obj, self.scale, only_articulated = False))
         self.mesh_tri = subdivide_mesh(self.mesh_tri, 0.01)
 
         print(len(self.mesh_tri.faces))
@@ -341,7 +376,7 @@ class Sampling:
         Returns:
         List of bounding boxes for articulated components.
         """
-        meshes = get_meshes(self.obj, only_articulated = True)
+        meshes = get_meshes(self.obj, self.scale, only_articulated = True)
         print("meshes", len(meshes))
         return get_bounding_boxes(meshes)
     
@@ -525,7 +560,7 @@ class Sampling:
         viewpoints = fibonacci_sphere(radius=radius, center=center, samples = number_of_viewpoints)
         return viewpoints
 
-    def create_balenced_cloud(self, ratio):             #the ratio stems from the antipodal points. It is assumed you want all antipodal points and then it samples based on the number of antipodal points
+    def create_balanced_cloud(self, ratio):             #the ratio stems from the antipodal points. It is assumed you want all antipodal points and then it samples based on the number of antipodal points
         #ratio relative to antipodal points
         # Get the points in each category
         """
@@ -549,7 +584,6 @@ class Sampling:
         # Calculate remaining points and ratios
         num_unarticulated = round(ratio[0] * num_antipodal)
         num_articulated = round(ratio[1] * num_antipodal)
-        print("num astart_timerticulated", num_unarticulated)
         # Randomly select points from each category
         selected_unarticulated = random.sample(list(unarticulated_points), num_unarticulated)
         selected_articulated = random.sample(list(articulated_points), num_articulated)
@@ -625,7 +659,7 @@ start_time = time.time()
 
 start_time = time.time()
 samp = Sampling(7167, 100000)
-#pc = samp.create_balenced_cloud([0, 0])
+#pc = samp.create_balanced_cloud([0, 0])
 #o3d.visualization.draw_geometries([samp.pcd_legacy, samp.mesh], point_show_normal=False)
 articulated = samp.get_articulated_points()
 print("articulated", len(articulated))
@@ -667,8 +701,8 @@ pc.paint(edges, [0, 1, 0])
 end_time = time.time()
 execution_time = end_time - start_time
 print(f"The function executed in {execution_time} seconds.")
-balenced = pc.create_balenced_cloud([0.1, 0.3])
-o3d.visualization.draw_geometries([balenced], point_show_normal=True)"""
+balanced = pc.create_balanced_cloud([0.1, 0.3])
+o3d.visualization.draw_geometries([balanced], point_show_normal=True)"""
 
 
 

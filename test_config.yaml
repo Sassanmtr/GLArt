@@ -1,0 +1,4 @@
+GripperSpinningFriction: 50
+ObjectSpinningFriction: 50
+GripperLateralFriction: 50
+ObjectLateralFriction: 50

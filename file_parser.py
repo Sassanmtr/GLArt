@@ -6,7 +6,7 @@ class FileParser:
     """
     A class for parsing URDF files to extract information about articulated and non-articulated objects.
     """
-    def __init__(self, object_number):
+    def __init__(self, data_dir, object_number):
         """
         Initialize the FileParser.
 
@@ -14,8 +14,10 @@ class FileParser:
         - object_number (str): The identifier for the object whose URDF file is to be parsed.
         """
         self.object_number = object_number
+        self.data_dir = data_dir
         self.tree = self.get_tree()
-        self.path = "/home/freyhe/anaconda3/lib/python3.10/site-packages/pybullet_data/"
+        
+        # self.data_dir = "/home/freyhe/anaconda3/lib/python3.10/site-packages/pybullet_data/"
 
 
     def get_tree(self):
@@ -25,8 +27,7 @@ class FileParser:
         Returns:
         - ElementTree object representing the URDF file.
         """
-        path = "/home/freyhe/anaconda3/lib/python3.10/site-packages/pybullet_data/"
-        urdf_file = path + str(self.object_number)+"/mobility.urdf"
+        urdf_file = self.data_dir + str(self.object_number)+"/mobility.urdf"
 
         tree = ETree.parse(urdf_file)
         return tree
@@ -138,7 +139,7 @@ class FileParser:
         Returns:
         - Full file path string.
         """
-        return self.path + str(self.object_number) + "/" + filename
+        return self.data_dir + str(self.object_number) + "/" + filename
 
     def get_center_of_object(self):
         """
