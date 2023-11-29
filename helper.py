@@ -336,8 +336,30 @@ def give_quaternion_roll(quaternion, roll):
     euler = p.getEulerFromQuaternion(quaternion)
     euler = list(euler)
     euler[0] = roll
+    #
+    # euler = [0.4, np.pi/2, 0]
+    #
     quaternion = p.getQuaternionFromEuler(euler)    
     return quaternion
+
+def quaternion_to_rotation_matrix(quaternion):
+    q0, q1, q2, q3 = quaternion
+    return np.array([
+        [1 - 2 * q2**2 - 2 * q3**2, 2 * (q1*q2 - q0*q3), 2 * (q1*q3 + q0*q2), 0],
+        [2 * (q1*q2 + q0*q3), 1 - 2 * q1**2 - 2 * q3**2, 2 * (q2*q3 - q0*q1), 0],
+        [2 * (q1*q3 - q0*q2), 2 * (q2*q3 + q0*q1), 1 - 2 * q1**2 - 2 * q2**2, 0],
+        [0, 0, 0, 1]
+    ])
+
+def create_transformation_matrix(position, quaternion):
+    # transformation_matrix = np.identity(4)
+    # transformation_matrix[:3, 3] = position
+    transformation_matrix = quaternion_to_rotation_matrix(quaternion)
+    transformation_matrix[:3, 3] = position
+    return transformation_matrix
+
+
+
 
 
 """

@@ -109,10 +109,15 @@ class Gripper:
         orthogonal_vector /= np.linalg.norm(orthogonal_vector)
 
  
+        # if self.open:
+        #     self.move_gripper(orthogonal_vector, 0.15)
+        # else:
+        #     self.move_gripper(orthogonal_vector, -0.15)
         if self.open:
-            self.move_gripper(orthogonal_vector, 0.15)
+            self.move_gripper(np.array(position), 0.15)
         else:
-            self.move_gripper(orthogonal_vector, -0.15)
+            self.move_gripper(np.array(position), -0.15)
+
 
     def adaptive_orientation(self, relative_orientation, object_id, joint_index):
         """
@@ -202,7 +207,6 @@ class Gripper:
         elif not self.open:
             self.interact(object)
             if object.reached_max_state(open=False):
-
                 self.open = None
         else:
             raise Exception("Open variable not set to True or False")

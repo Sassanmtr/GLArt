@@ -23,7 +23,14 @@ def run_simulation(gripper, object_id, steps=10000, sleep=1/1000, open = True):
 
 
     #camera setup
-    for i in range(steps):  
+    start_time = time.time()
+    max_simulation_time = 100
+    for i in range(steps):
+        elapsed_time = time.time() - start_time
+        # Check if the elapsed time exceeds the maximum simulation time
+        if elapsed_time > max_simulation_time:
+            print("Simulation timeout exceeded")
+            return "Simulation timeout exceeded"  
         #now we run the actual simulation
         if gripper.open == None:
             break

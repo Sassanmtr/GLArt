@@ -10,41 +10,139 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import random
 import urdfpy
+import trimesh
 
-def load_and_transform_mesh(mesh_filename, origin, scale):
-    loaded_mesh = load_mesh(mesh_filename)
-    loaded_mesh.apply_scale(scale)
-    apply_origin_transform(loaded_mesh, origin)
-    return loaded_mesh
-
-    return None  # Placeholder, replace with actual implementation
-
-def load_urdf_meshes(urdf_file_path, scale=1.0, only_articulated=False):
-    # Load the URDF robot model
+def test_urdf_meshes(obj, urdf_file_path, scale, joint_state, only_articulated=False):
     arti_obj = urdfpy.URDF.load(urdf_file_path)
-
+    joint_name = arti_obj.actuated_joints[0].name
     transformed_meshes = []
+    mesh_names = {}
+    mesh_poses = {}
+    # for mesh, pose in arti_obj.visual_geometry_fk({joint_name: joint_state}).items():
+    #     mesh_names[mesh] = mesh.mesh.filename
+    for mesh, pose in arti_obj.visual_trimesh_fk({joint_name: joint_state}).items():
+        mesh_name = 'textured_objs/'+mesh.metadata['file_name']
+        mesh_poses[mesh_name] = pose['pose']
 
-    for link_name, link in arti_obj.links.items():
-        # Check if only articulated meshes are requested
-        if only_articulated and link_name not in arti_obj.active_links:
-            continue
+    if only_articulated == True:
+        mesh_dict, origin = obj.get_articulated_meshes()
+    if only_articulated == False:
+        mesh_dict, origin = obj.get_all_meshes()
 
-        for visual in link.visuals:
-            origin = visual.origin
-            mesh_filename = visual.geometry.mesh.filename
-
-            # Load and transform the mesh
-            # You would need to implement the actual loading and transformation logic here
-            # Example: Load the mesh and apply the scale
-            transformed_mesh = load_and_transform_mesh(mesh_filename, origin, scale)
-
-            if transformed_mesh is not None:
-                transformed_meshes.append(transformed_mesh)
-
+    import pyrender
+    scene = pyrender.Scene()
+    for key, value in mesh_dict.items():
+        for filename in value:
+            # Load the mesh
+            loaded = tri.load_mesh(obj.get_full_path(filename))
+            
+            # If the loaded object is a Scene, dump it to get a list of Trimesh objects
+            meshes = loaded.dump() if isinstance(loaded, tri.Scene) else [loaded]
+            
+            for mesh in meshes:
+                mesh.apply_scale(scale)
+                mat = np.eye(4)
+                mat[:3, 3] = origin
+                mesh.apply_transform(np.dot(mat, mesh_poses[filename]))
+                # mesh.apply_transform(mesh_poses[filename])
+                # mesh.face_angles[:, 1] += joint_state
+                
+                transformed_meshes.append(mesh)
+                mesh = pyrender.Mesh.from_trimesh(mesh, smooth=False)
+                scene.add(mesh)#, pose=pose['pose'])
+    pyrender.Viewer(scene, use_raymond_lighting=True)
     return transformed_meshes
 
 
+
+def load_urdf_meshes(obj, urdf_file_path, scale, joint_state, only_articulated=False):
+    if only_articulated == True:
+        mesh_dict, origin = obj.get_articulated_meshes()
+    if only_articulated == False:
+        mesh_dict, origin = obj.get_all_meshes()
+    # Load the URDF robot model
+    arti_obj = urdfpy.URDF.load(urdf_file_path)
+    # Open the articulated joints to the desired joint state
+    articulated_link = [joint.child for joint in arti_obj.actuated_joints]
+    joint_name = arti_obj.actuated_joints[0].name
+    # fk = arti_obj.link_fk({joint_name: joint_state})
+    transformed_meshes = []
+    actuated_meshes = arti_obj.visual_trimesh_fk(links=articulated_link).keys()
+    # new added code
+    corres_meshes = []
+    for key, value in mesh_dict.items():
+        for filename in value:
+            corres_meshes.append(filename)
+
+    # # Visualization
+    # import pyrender
+    # scene = pyrender.Scene()
+    # # Define the length of the axes
+    # axis_length = 1
+
+    # # Define the colors for the axes (R, G, B)
+    # x_color = [1.0, 0.0, 0.0]  # Red for X-axis
+    # y_color = [0.0, 1.0, 0.0]  # Green for Y-axis
+    # z_color = [0.0, 0.0, 1.0]  # Blue for Z-axis
+
+    # num_points = 100
+    # # Create points for lines along each axis
+    # x_points = np.array([[i * axis_length / num_points, 0, 0] for i in range(num_points)])
+    # y_points = np.array([[0, i * axis_length / num_points, 0] for i in range(num_points)])
+    # z_points = np.array([[0, 0, i * axis_length / num_points] for i in range(num_points)])
+
+    # # Create mesh objects for the lines
+    # for i in range(num_points - 1):
+    #     x_segment = pyrender.Mesh.from_points(x_points[i:i+2], colors=np.tile(x_color, (2, 1)))
+    #     y_segment = pyrender.Mesh.from_points(y_points[i:i+2], colors=np.tile(y_color, (2, 1)))
+    #     z_segment = pyrender.Mesh.from_points(z_points[i:i+2], colors=np.tile(z_color, (2, 1)))
+        
+    #     # Add the line segments to the scene
+    #     scene.add(x_segment)
+    #     scene.add(y_segment)
+    #     scene.add(z_segment)
+
+    rx = np.deg2rad(-90)  # Rotate 90 degrees around X-axis
+    ry = np.deg2rad(90)  # Rotate 90 degrees around Y-axis
+
+    # Create the corrective rotation matrices
+    rotation_matrix_x = np.array([
+        [1, 0, 0],
+        [0, np.cos(rx), -np.sin(rx)],
+        [0, np.sin(rx), np.cos(rx)]
+    ])
+    rotation_matrix_y = np.array([
+        [np.cos(ry), 0, np.sin(ry)],
+        [0, 1, 0],
+        [-np.sin(ry), 0, np.cos(ry)]
+    ])
+
+    # Combine the corrective rotations
+    combined_rotation_matrix = rotation_matrix_y @ rotation_matrix_x
+    internal_transformed = np.eye(4)
+    internal_transformed[:3, :3] = combined_rotation_matrix
+    for mesh, pose in arti_obj.visual_trimesh_fk({joint_name: joint_state}).items():
+        try: 
+            mesh_name = 'textured_objs/'+mesh.metadata['file_name']
+        except:
+            mesh_name = 'textured_objs/'+mesh.metadata['name']
+        if mesh_name in corres_meshes:
+            # # mesh.apply_scale(scale)
+            scale_mat = np.eye(4) * scale
+            scale_mat[3, 3] = 1.0
+            mesh.apply_transform(scale_mat @ internal_transformed @ pose['pose'])  
+            transformed_meshes.append(mesh)
+        # mesh = pyrender.Mesh.from_trimesh(mesh, smooth=False)
+        # scene.add(mesh)#, pose=pose['pose'])
+ 
+    # pyrender.Viewer(scene, use_raymond_lighting=True)
+
+    return transformed_meshes
+
+# urdf_file_path = '/home/mokhtars/Documents/Thesis/datasets/others/CatData/Microwave/7310/mobility.urdf'
+# obj = FileParser("/home/mokhtars/Documents/articulatedobjectsgraspsampling/", "7221")
+# urdf_file_path = '/home/mokhtars/Documents/articulatedobjectsgraspsampling/7221/mobility.urdf'
+# load_urdf_meshes(obj, urdf_file_path=urdf_file_path, scale=0.5, joint_state=0.3, only_articulated=False)
 
 def get_meshes(obj, scale, only_articulated = False):
     """
@@ -116,8 +214,17 @@ def trimesh_to_o3d(mesh):
     """
 
     mesh_o3d = o3d.geometry.TriangleMesh()
+    scaled_vertices = mesh.vertices * 0.3
     mesh_o3d.vertices = o3d.utility.Vector3dVector(mesh.vertices)
+    # mesh_o3d.vertices = o3d.utility.Vector3dVector(scaled_vertices)
     mesh_o3d.triangles = o3d.utility.Vector3iVector(mesh.faces)
+    # Create coordinate axes as lines with respective colors
+    # axes = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1, origin=[0, 0, 0])
+
+    # Add the Open3D mesh and coordinate axes to a geometry list
+    # geometries = [mesh_o3d, axes]
+    # o3d.visualization.draw_geometries([mesh_o3d])
+    # o3d.visualization.draw_geometries(geometries)
     return mesh_o3d
 
 def fibonacci_sphere(radius, center, samples = 100):
@@ -181,7 +288,7 @@ def subdivide_mesh(mesh, max_triangle_area):
         mesh = mesh.subdivide(faces_to_subdivide)
     return mesh
 
-def get_balanced_pointcloud(data_dir, obj_id, scale, number_of_points, ratio):
+def get_balanced_pointcloud(data_dir, obj_id, scale, joint_state, number_of_points, ratio):
     """
     Generate a balanced point cloud for an object.
 
@@ -193,13 +300,13 @@ def get_balanced_pointcloud(data_dir, obj_id, scale, number_of_points, ratio):
     Returns:
     pcd: Point cloud with balanced distribution of points.
     """
-    samp = Sampling(data_dir, obj_id, scale, 100000)
+    samp = Sampling(data_dir, obj_id, scale, joint_state, 100000)
     pc = samp.create_balanced_cloud(ratio)
     combined_points = pc.points
     combined_normals = pc.normals
     for _ in range((number_of_points // 100000)-1): #this is done because the sampling time is exponential so we just always run it for 100k and then add the points
 
-        samp = Sampling(data_dir, obj_id, scale, 100000)
+        samp = Sampling(data_dir, obj_id, scale, joint_state, 100000)
         pc = samp.create_balanced_cloud(ratio)
         combined_points = np.vstack((combined_points, pc.points))
         combined_normals = np.vstack((combined_normals, pc.normals))
@@ -210,7 +317,7 @@ def get_balanced_pointcloud(data_dir, obj_id, scale, number_of_points, ratio):
     
 
 class Sampling:
-    def __init__(self, data_dir, object_number, scale, number_of_points = 100000):
+    def __init__(self, data_dir, object_number, scale, joint_state, number_of_points = 100000):
         """
         Initialize the Sampling object.
         
@@ -222,8 +329,12 @@ class Sampling:
         self.object_number = object_number
         self.data_dir = data_dir
         self.scale = scale
+        self.joint_state = joint_state
         self.obj = FileParser(self.data_dir, self.object_number)
-        self.mesh_tri = merge_meshes(get_meshes(self.obj, self.scale, only_articulated = False))
+        self.urdf_file_path = self.data_dir + str(self.object_number) + "/mobility.urdf"
+        self.mesh_tri = merge_meshes(load_urdf_meshes(self.obj, self.urdf_file_path, self.scale, self.joint_state, only_articulated = False))
+        # self.mesh_tri = merge_meshes(test_urdf_meshes(self.obj, self.urdf_file_path, self.scale, self.joint_state, only_articulated = False))
+        # self.mesh_tri = merge_meshes(get_meshes(self.obj, self.scale, only_articulated = False))
         self.mesh_tri = subdivide_mesh(self.mesh_tri, 0.01)
 
         print(len(self.mesh_tri.faces))
@@ -376,7 +487,8 @@ class Sampling:
         Returns:
         List of bounding boxes for articulated components.
         """
-        meshes = get_meshes(self.obj, self.scale, only_articulated = True)
+        meshes = load_urdf_meshes(self.obj, self.urdf_file_path, self.scale, self.joint_state, only_articulated = True)
+        # meshes = test_urdf_meshes(self.obj, self.urdf_file_path, self.scale, self.joint_state, only_articulated = True)
         print("meshes", len(meshes))
         return get_bounding_boxes(meshes)
     
@@ -544,7 +656,7 @@ class Sampling:
             obb = o3d.geometry.OrientedBoundingBox.create_from_axis_aligned_bounding_box(bbox)
             geometries.append(obb)
 
-        o3d.visualization.draw_geometries(geometries)
+        # o3d.visualization.draw_geometries(geometries)
 
     def get_viewpoints(self, number_of_viewpoints):
         """
@@ -586,6 +698,12 @@ class Sampling:
         num_articulated = round(ratio[1] * num_antipodal)
         # Randomly select points from each category
         selected_unarticulated = random.sample(list(unarticulated_points), num_unarticulated)
+        # if num_unarticulated > len(list(unarticulated_points)):
+        #     selected_unarticulated = random.sample(list(unarticulated_points), len(list(unarticulated_points)))
+        #     selected_articulated = random.sample(list(articulated_points), len(list(articulated_points)))
+        # else:
+        #     selected_unarticulated = random.sample(list(unarticulated_points), num_unarticulated)
+        #     selected_articulated = random.sample(list(articulated_points), num_articulated)
         selected_articulated = random.sample(list(articulated_points), num_articulated)
         print("selected articulated", len(selected_articulated))
 

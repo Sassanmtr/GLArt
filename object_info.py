@@ -117,10 +117,11 @@ class Object:
         Returns:
         - bool: True if the object reached its maximum state, False otherwise.
         """
+        close_error_margin = error_margin + 0.09
         if open:
             return p.getJointState(self.object_id, self.interaction_joint_link_index)[0] >= self.min_max_joint_position[1] - error_margin
         if open == False:
-            return p.getJointState(self.object_id, self.interaction_joint_link_index)[0] <= self.min_max_joint_position[0] + error_margin
+            return p.getJointState(self.object_id, self.interaction_joint_link_index)[0] <= self.min_max_joint_position[0] + close_error_margin
         
     def desired_state(self, error_margin=0.01): #making sure other joints have not moved from their stating position
         """
