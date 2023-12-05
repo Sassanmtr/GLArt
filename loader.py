@@ -4,7 +4,7 @@ from gripper import Gripper
 import urdfpy
 
 
-def load_gripper(param_config, assets_dir, startPosition, start_orientation_quaternion) -> None:
+def load_gripper(assets_dir, startPosition, start_orientation_quaternion) -> None:
     """
     Loads the gripper into the simulation.
 
@@ -17,7 +17,8 @@ def load_gripper(param_config, assets_dir, startPosition, start_orientation_quat
     Returns:
     - Gripper: An instance of the Gripper class.
     """
-    gripperID = p.loadURDF(assets_dir + "panda_gripper.urdf", startPosition, start_orientation_quaternion,useFixedBase=False, globalScaling = 1.0) #scale important parameter
+    urdf_path = os.path.join(assets_dir, "panda_gripper.urdf")
+    gripperID = p.loadURDF(urdf_path, startPosition, start_orientation_quaternion,useFixedBase=False, globalScaling = 1.0) #scale important parameter
 
     p.resetJointState(0, 0, 0.04)
     p.resetJointState(0, 1, 0.04)
@@ -69,7 +70,7 @@ def modify_urdf_joint_orientation(data_dir, object_number, joint_state):
 
     return modified_urdf_file
 
-def load_obj(param_config, data_dir, object_number, center_of_object, scale, joint_state):
+def load_obj(data_dir, object_number, center_of_object, scale, joint_state):
     """
     Loads the object into the simulation.
 
@@ -83,7 +84,7 @@ def load_obj(param_config, data_dir, object_number, center_of_object, scale, joi
 
     # modified_urdf_file = modify_urdf_joint_orientation(data_dir, object_number, joint_state)
 
-    location = data_dir+str(object_number)+"/mobility.urdf"
+    location = os.path.join(data_dir, str(object_number), "mobility.urdf")
     world_com, _ = p.multiplyTransforms([0,0,0], [0, 0, 0, 1], center_of_object, [0, 0, 0, 1])
 
     objID = p.loadURDF(location, globalScaling=scale, useFixedBase=True, 
@@ -168,9 +169,9 @@ def load_point_cloud(point):
     """
 
     #p.loadURDF("/block.urdf", globalScaling=0.1, useFixedBase=True, basePosition=point, baseOrientation=[0,0,0,1])
-    print(point)
+    # print(point)
 
-def load_assets(param_config, data_dir, assets_dir, gripper_start_position, gripper_start_orientation, object_number, center_of_object, balanced_cloud, scale, joint_state):
+def load_assets(data_dir, assets_dir, gripper_start_position, gripper_start_orientation, object_number, center_of_object, balanced_cloud, scale, joint_state):
     """
     Loads all assets into the simulation.
 
@@ -184,9 +185,9 @@ def load_assets(param_config, data_dir, assets_dir, gripper_start_position, grip
     Returns:
     - tuple: A tuple containing the gripper and object IDs.
     """
-    gripper = load_gripper(param_config, assets_dir, gripper_start_position, gripper_start_orientation)
+    gripper = load_gripper(assets_dir, gripper_start_position, gripper_start_orientation)
     points = load_point_cloud(balanced_cloud)
-    object_id = load_obj(param_config, data_dir, object_number, center_of_object, scale, joint_state)
+    object_id = load_obj(data_dir, object_number, center_of_object, scale, joint_state)
 
 
     return gripper, object_id

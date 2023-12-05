@@ -1,3 +1,4 @@
+import os
 import trimesh as tri
 from file_parser import FileParser
 import numpy as np
@@ -331,20 +332,20 @@ class Sampling:
         self.scale = scale
         self.joint_state = joint_state
         self.obj = FileParser(self.data_dir, self.object_number)
-        self.urdf_file_path = self.data_dir + str(self.object_number) + "/mobility.urdf"
+        self.urdf_file_path = os.path.join(self.data_dir, str(self.object_number), "mobility.urdf")
         self.mesh_tri = merge_meshes(load_urdf_meshes(self.obj, self.urdf_file_path, self.scale, self.joint_state, only_articulated = False))
         # self.mesh_tri = merge_meshes(test_urdf_meshes(self.obj, self.urdf_file_path, self.scale, self.joint_state, only_articulated = False))
         # self.mesh_tri = merge_meshes(get_meshes(self.obj, self.scale, only_articulated = False))
         self.mesh_tri = subdivide_mesh(self.mesh_tri, 0.01)
 
-        print(len(self.mesh_tri.faces))
+        # print(len(self.mesh_tri.faces))
 
         self.mesh = trimesh_to_o3d(self.mesh_tri)
         viewpoints = self.get_viewpoints(500)
 
         triangles = self.get_visible_triangles(viewpoints)
         self.visable_mesh = self.mesh_from_triangle_index(triangles)
-        print("Number of triangles:", len(self.visable_mesh.triangles))
+        # print("Number of triangles:", len(self.visable_mesh.triangles))
         #self.make_mesh_double_sided()
 
         self.visable_mesh.normalize_normals()
@@ -374,7 +375,7 @@ class Sampling:
         Returns:
         List of indices of nearest points.
         """
-        print("point", point)
+        # print("point", point)
         [k, idx, _] = self.pcd_tree.search_radius_vector_3d(self.pcd_cuda.points[point], radius)
         if len(idx) < number_of_nearest_points:
             return list(idx)
@@ -388,8 +389,8 @@ class Sampling:
         points: List of point indices to paint.
         color: The color to paint the points.
         """
-        print(points)
-        print(len(points))
+        # print(points)
+        # print(len(points))
         np.asarray(self.pcd_legacy.colors)[list(points), :] = color
     
     def is_potentially_grippable(self, point, points):
@@ -477,7 +478,7 @@ class Sampling:
         Set of articulated points.
         """
         boxes = self.get_articulated_bounding_boxes()
-        print("boxes", boxes)
+        # print("boxes", boxes)
         return self.get_points_in_boxes(boxes, self.pcd_cuda.points)
     
     def get_articulated_bounding_boxes(self):
@@ -489,7 +490,7 @@ class Sampling:
         """
         meshes = load_urdf_meshes(self.obj, self.urdf_file_path, self.scale, self.joint_state, only_articulated = True)
         # meshes = test_urdf_meshes(self.obj, self.urdf_file_path, self.scale, self.joint_state, only_articulated = True)
-        print("meshes", len(meshes))
+        # print("meshes", len(meshes))
         return get_bounding_boxes(meshes)
     
     def make_mesh_double_sided(self):
@@ -639,7 +640,7 @@ class Sampling:
         number_of_boxes = len(boxes)
         number_of_viewpoints = self.number_of_points // number_of_boxes
         viewpoints = fibonacci_sphere(radius=radius, center=center, samples = number_of_viewpoints)
-        print("the number of viewpoints are:", number_of_viewpoints)
+        # print("the number of viewpoints are:", number_of_viewpoints)
         points = self.sample_points_from_viewpoints(viewpoints, boxes)
         points = np.array(points)
         pcd_cuda = o3d.geometry.PointCloud()
@@ -705,11 +706,11 @@ class Sampling:
         #     selected_unarticulated = random.sample(list(unarticulated_points), num_unarticulated)
         #     selected_articulated = random.sample(list(articulated_points), num_articulated)
         selected_articulated = random.sample(list(articulated_points), num_articulated)
-        print("selected articulated", len(selected_articulated))
+        # print("selected articulated", len(selected_articulated))
 
         # Combine the selected points into a new point cloud
         new_points = np.concatenate([selected_unarticulated, selected_articulated, list(antipodal_points)])
-        print("new points", len(new_points), new_points)
+        # print("new points", len(new_points), new_points)
 
         new_points = list(map(int, new_points))
         new_point_cloud = o3d.geometry.PointCloud()
@@ -746,7 +747,7 @@ class Sampling:
         normals[odd_indices] = -normals[odd_indices]
         self.pcd_cuda.normals = o3d.utility.Vector3dVector(normals)
         end_time = time.time()
-        print(f"Ray tracing took {end_time - start_time} seconds.")
+        # print(f"Ray tracing took {end_time - start_time} seconds.")
 
     def check_collision(self, points):
         """
@@ -767,7 +768,7 @@ class Sampling:
 
         ans = scene.cast_rays(rays)
 
-        print(ans.keys())
+        # print(ans.keys())
 """
 start_time = time.time()
 

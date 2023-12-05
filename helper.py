@@ -259,10 +259,10 @@ def transform_open3d_to_pybullet_pointcloud(points):
     """
 
     transformed_points = []
-    print("before: ", points[0])
+    # print("before: ", points[0])
     for point in points:
         transformed_points.append(transform_open3d_to_pybullet(point))
-    print("before: ", transformed_points[0])
+    # print("before: ", transformed_points[0])
     return transformed_points
 
 def transform_open3d_to_pybullet(point):
@@ -337,11 +337,23 @@ def give_quaternion_roll(quaternion, roll):
     euler = list(euler)
     euler[0] = roll
     #
-    # euler = [0.4, np.pi/2, 0]
+    # euler = [0.7, np.pi/2, np.pi/2]
+    # euler = [0.4, (0.5*np.pi), (np.pi/2)]
     #
-    quaternion = p.getQuaternionFromEuler(euler)    
-    return quaternion
+    from scipy.spatial.transform import Rotation
 
+    # Given Euler angles (in radians)
+    euler_angles = np.array([-np.pi/2, np.pi/2, 0])
+    additional_angles = np.array([0, 0, np.pi/2])
+    # # Convert Euler angles to rotation matrix
+    rotation_matrix = Rotation.from_euler('xyz', euler_angles).as_matrix()
+    rotation_matrix = np.dot(rotation_matrix, Rotation.from_euler('xyz', additional_angles).as_matrix())
+    quaternion = Rotation.from_matrix(rotation_matrix).as_quat()
+
+    # quaternion = p.getQuaternionFromEuler(euler_angles)
+    euler2 = p.getEulerFromQuaternion(quaternion)    
+    return quaternion
+    # return randomized_orientation_quaternion
 def quaternion_to_rotation_matrix(quaternion):
     q0, q1, q2, q3 = quaternion
     return np.array([

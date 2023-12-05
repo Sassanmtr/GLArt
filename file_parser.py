@@ -1,3 +1,4 @@
+import os
 import xml.etree.ElementTree as ETree
 import open3d
 import numpy as np
@@ -27,8 +28,7 @@ class FileParser:
         Returns:
         - ElementTree object representing the URDF file.
         """
-        urdf_file = self.data_dir + str(self.object_number)+"/mobility.urdf"
-
+        urdf_file = os.path.join(self.data_dir, str(self.object_number), "mobility.urdf")
         tree = ETree.parse(urdf_file)
         return tree
 
@@ -172,7 +172,7 @@ class FileParser:
             if mesh_concat is None:
                 continue
             vertices = np.asarray(mesh_concat.vertices)
-            print(vertices.shape)
+            # print(vertices.shape)
 
             mean = np.array(vertices.mean(axis=0))
 

@@ -1,0 +1,22 @@
+{
+    "7221": {
+        "link": "right",
+        "handle": "vertical"
+    },
+    "7236": {
+        "link": "right",
+        "handle": "none"
+    },
+    "7292": {
+        "link": "t",
+        "handle": "none"
+    },
+    "7304": {
+        "link": "right",
+        "handle": "none"
+    },
+    "7310": {
+        "link": "right",
+        "handle": "vertical"
+    }
+}
