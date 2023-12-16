@@ -2,9 +2,15 @@ import os
 import numpy as np
 import json
 import urdfpy
-from episode_handler import precompute_pointcloud
+import multiprocessing
+from functools import partial
 from pathlib import Path
 from tqdm import tqdm
+from file_parser import FileParser
+from sampling import get_balanced_pointcloud
+from helper import transform_open3d_to_pybullet_pointcloud, transform_open3d_to_pybullet
+
+
 
 def joint_states_generator(data_dir, object_name, object_handle_info, nr_states):
     """
@@ -33,6 +39,35 @@ def joint_states_generator(data_dir, object_name, object_handle_info, nr_states)
     return joint_states
 
 
+def precompute_pointcloud(data_dir, save_dir, object_name, scale, joint_state, number_of_points, ratio):
+    # setup_physics_client()
+    # scale = object_config['scale']
+    # joint_state = object_config['joint_state']
+    # object_name = object_config['object_name']
+    # save_dir = os.path.join(save_dir, "pointclouds")
+    balanced_cloud = get_balanced_pointcloud(data_dir, object_name, scale, joint_state, number_of_points, ratio)
+    # o3d.visualization.draw_geometries([balanced_cloud], point_show_normal=True)
+    obj = FileParser(data_dir, object_name)
+    center_of_object = obj.get_center_of_object()
+    center_of_object = transform_open3d_to_pybullet(center_of_object)
+    balanced_points = transform_open3d_to_pybullet_pointcloud(balanced_cloud.points)
+    balanced_normals = transform_open3d_to_pybullet_pointcloud(balanced_cloud.normals)
+    points = list(range(len(balanced_points)))
+    data_dict = {
+        'balanced_points': balanced_points,
+        'balanced_normals': balanced_normals,
+        'points': points,
+        'center_of_object': center_of_object
+    }
+    np.savez(os.path.join(save_dir, f'{object_name}_{scale}_{joint_state}.npz'), **data_dict)
+
+
+def process_object(object_args):
+    data_directory, save_directory, object_name, scale, joint_state, number_of_points, ratio = object_args
+    precompute_pointcloud(data_directory, save_directory, object_name, scale, joint_state, number_of_points, ratio)
+
+
+
 if __name__ == "__main__":
     current_directory = Path.cwd()
     # parent_directory = current_directory.parent
@@ -50,6 +85,29 @@ if __name__ == "__main__":
 
     # Hard code scales for microwaves (TODO: generalize with generating and parsing a file for scales)
     scales = [0.3, 0.4]
+
+    # num_processes = multiprocessing.cpu_count()
+    # pool = multiprocessing.Pool(processes=num_processes)
+
+    # jobs = []
+
+    # for object_name in link_handle_info.keys():
+    #     joint_states = joint_states_generator(data_directory, object_name, link_handle_info, 10)
+    #     for scale in scales:
+    #         for joint_state in joint_states:
+    #             args = (data_directory, save_directory, object_name, scale, joint_state, number_of_points, ratio)
+    #             jobs.append(args)
+
+    # # Use partial to create a function with fixed arguments
+    # partial_process_file = partial(process_object)
+    # # Map the function to the list of file arguments using multiprocessing
+    # pool.map(partial_process_file, jobs)
+    # pool.close()
+    # pool.join()
+
+
+
+
 
     for object_name in link_handle_info.keys():
         joint_states = joint_states_generator(data_directory, object_name, link_handle_info, 10)

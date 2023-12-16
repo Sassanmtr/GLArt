@@ -5,4 +5,6 @@ open3d
 trimesh
 pyglet
 Rtree
+rerun
 git+https://github.com/chisarie/urdfpy
+git+https://github.com/heppert-tri/mesh_to_sdf.git

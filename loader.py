@@ -32,7 +32,7 @@ def load_gripper(assets_dir, startPosition, start_orientation_quaternion) -> Non
         gripperID, 
         -1, 
         # lateralFriction=friction, 
-        # mass=gripper_mass,
+        # mass=5,
         # restitution=resti,
         )
     dyn_info = p.getDynamicsInfo(gripperID, -1)

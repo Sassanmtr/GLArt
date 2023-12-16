@@ -1,4 +1,16 @@
 {
+    "7128": {
+        "link": "right",
+        "handle": "none"
+    },
+    "7221": {
+        "link": "right",
+        "handle": "vertical"
+    },
+    "7236": {
+        "link": "right",
+        "handle": "none"
+    },
     "7310": {
         "link": "right",
         "handle": "vertical"

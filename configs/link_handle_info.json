@@ -1,4 +1,8 @@
 {
+    "7128": {
+        "link": "right",
+        "handle": "none"
+    },
     "7221": {
         "link": "right",
         "handle": "vertical"
@@ -8,7 +12,7 @@
         "handle": "none"
     },
     "7292": {
-        "link": "t",
+        "link": "top",
         "handle": "none"
     },
     "7304": {
@@ -18,5 +22,9 @@
     "7310": {
         "link": "right",
         "handle": "vertical"
+    },
+    "7306": {
+        "link": "top",
+        "handle": "none"
     }
 }

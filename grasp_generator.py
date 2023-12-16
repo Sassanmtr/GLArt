@@ -8,6 +8,8 @@ from tqdm import tqdm
 from glob import glob
 import pybullet as p
 import pybullet_data
+import multiprocessing
+from functools import partial
 from scipy.spatial.transform import Rotation
 from simulation import run_simulation
 from loader import load_assets
@@ -23,6 +25,17 @@ def run(data_dir, assets_dir, gripper_start_position, gripper_start_orientation,
     result = run_simulation(gripper, object_id, steps = 6000000, sleep = 1/1000)
 
     return result
+
+def trans_mat_creator(point, quaternion):
+    rotation = Rotation.from_quat(quaternion)
+    rotation_matrix = rotation.as_matrix()
+    transform_matrix = np.eye(4)
+    transform_matrix[:3, :3] = rotation_matrix
+    transform_matrix[:3, 3] = point
+
+    return transform_matrix
+
+
 
 def limit_rotation_quat_link(initial_orientation_euler):
     quaternion = []
@@ -68,33 +81,28 @@ def valid_grasp_orientations(link_data, handle_data, joint_state):
                 valid_orientations.append(orientation_handle_quat)
 
     elif link_data == "left":
-        if joint_state == 0:
-            valid_orientations = valid_orientations.append([-float(joint_state), np.pi/2, 0])
-        else:
-            initial_orientation_euler = [0, -np.pi/2, np.pi/2+float(joint_state)]
-            valid_orientations = limit_rotation_quat_link(initial_orientation_euler)
-            if handle_data != "none":
-                initial_orientation_euler_handle = [-float(joint_state), np.pi/2, 0]
-                orientation_handle_quat = rotation_quat_handle(initial_orientation_euler_handle, handle_data)
-                if joint_state == 0: # If joint_state is closed, then the only valid grasp is the handle
-                    valid_orientations = []
-                    valid_orientations.append(orientation_handle_quat)
-                else:
-                    valid_orientations.append(orientation_handle_quat)
+        initial_orientation_euler = [0, -np.pi/2, np.pi/2+float(joint_state)]
+        valid_orientations = limit_rotation_quat_link(initial_orientation_euler)
+        if handle_data != "none":
+            initial_orientation_euler_handle = [-float(joint_state), np.pi/2, 0]
+            orientation_handle_quat = rotation_quat_handle(initial_orientation_euler_handle, handle_data)
+            if joint_state == 0: # If joint_state is closed, then the only valid grasp is the handle
+                valid_orientations = []
+                valid_orientations.append(orientation_handle_quat)
+            else:
+                valid_orientations.append(orientation_handle_quat)
+
     elif link_data == "top":
-        if joint_state == 0:
-            valid_orientations = valid_orientations.append([float(joint_state), np.pi, np.pi/2])
-        else:
-            initial_orientation_euler_link = [float(joint_state), np.pi, np.pi/2]
-            valid_orientations = limit_rotation_quat_link(initial_orientation_euler_link)
-            if handle_data != "none":
-                initial_orientation_euler_handle = [0, np.pi/2 - float(joint_state), 0]
-                orientation_handle_quat = rotation_quat_handle(initial_orientation_euler_handle, handle_data)
-                if joint_state == 0: # If joint_state is closed, then the only valid grasp is the handle
-                    valid_orientations = []
-                    valid_orientations.append(orientation_handle_quat)
-                else:
-                    valid_orientations.append(orientation_handle_quat)
+        initial_orientation_euler_link = [float(joint_state), np.pi, np.pi/2]
+        valid_orientations = limit_rotation_quat_link(initial_orientation_euler_link)
+        if handle_data != "none":
+            initial_orientation_euler_handle = [0, np.pi/2 - float(joint_state), 0]
+            orientation_handle_quat = rotation_quat_handle(initial_orientation_euler_handle, handle_data)
+            if joint_state == 0: # If joint_state is closed, then the only valid grasp is the handle
+                valid_orientations = []
+                valid_orientations.append(orientation_handle_quat)
+            else:
+                valid_orientations.append(orientation_handle_quat)
     
     elif link_data == "bottom":
         initial_orientation_euler_link = [float(joint_state), 0, np.pi]
@@ -137,7 +145,6 @@ def precomputed_main(assets_dir, dataset_dir, data_dir, link_info, handle_info, 
     # joint_state = 1.5707963267948966 hardcoded for debugging
     pointcloud_path = os.path.join(dataset_dir, "pointclouds", f"{object_name}_{scale}_{joint_state}.npz")
     success_poses = []
-    result_dict = {}
     # Load the data from the .npz file
     loaded_data = np.load(pointcloud_path, allow_pickle=True)
     # Access individual arrays by their keys
@@ -165,17 +172,17 @@ def precomputed_main(assets_dir, dataset_dir, data_dir, link_info, handle_info, 
 
         result = run(data_dir, assets_dir, gripper_start_position, gripper_start_orientation, object_name, center_of_object, point, scale, joint_state)
         p.resetSimulation()
-        print("result: ", result)
+        print("RESULTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT: ", result)
         if result == "Success" :#or result == "Partial success"
-            result_dict[int(point_index)] = [gripper_start_position, gripper_start_orientation]
             # points_success.append(point_index)
-            selected_pose = create_transformation_matrix(point, gripper_start_orientation)
+            selected_pose = trans_mat_creator(point, gripper_start_orientation)
             success_poses.append(selected_pose)
             success_count += 1
             print("Number of successful grasps: ", success_count)
         gc.collect()
         if success_count == grasp_limit:
-            break   
+            break
+       
     success_grasps = np.array(success_poses)
     grasp_path = os.path.join(dataset_dir, "grasps", f"{object_name}_{scale}_{joint_state}.npy")
     np.save(grasp_path, success_grasps)
@@ -185,11 +192,13 @@ def precomputed_main(assets_dir, dataset_dir, data_dir, link_info, handle_info, 
 
 
 if __name__ == "__main__":
-    # Initialize the PyBullet GUI mode and configure the visualizer
+    # ## Initialize the PyBullet GUI mode and configure the visualizer
     p.connect(p.GUI)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
-    
+
+    multiproc = False
+    starting_time = time.time()
     current_directory = Path.cwd()
     dataset_dir = current_directory / 'datasets'
     pcl_dir = dataset_dir / 'pointclouds'
@@ -199,19 +208,58 @@ if __name__ == "__main__":
     link_handle_path = os.path.join(str(current_directory), "configs", "current_link_handle_info.json")
     with open(link_handle_path, "r") as f:
         link_handle_info = json.load(f)
-    for object_name, lh_info in link_handle_info.items():
-        link_info = lh_info["link"]
-        handle_info = lh_info["handle"]
-        # Create a pattern to match .npz files for the current object_name
-        pattern = str(pcl_dir / f"{object_name}_*.npz")
-        matching_files = glob(pattern)
-        for file in tqdm(matching_files):
-            # Extract the scale and joint state from the file name
+    
+    # Run the precomputed_main function
+    if multiproc:
+        # Create a pool of worker processes
+        def process_file(args):
+            file, current_directory, dataset_dir, data_dir, link_info, handle_info, object_name = args
             scale = float(file.split("_")[1])
             joint_state = float(file.split("_")[2][:-4])
-            # Run the precomputed_main function
             precomputed_main(str(current_directory), str(dataset_dir), data_dir, link_info, handle_info, object_name, 
-                             scale, joint_state, 100, rot_sample_mode="nope")
-        print()
+                            scale, joint_state, 500, rot_sample_mode="nope")
+            
+        num_processes = multiprocessing.cpu_count()  
+        pool = multiprocessing.Pool(processes=num_processes)
 
-    
+        # Create a list of arguments for each file and object
+        file_args_list = []
+        for object_name, lh_info in link_handle_info.items():
+            link_info = lh_info["link"]
+            handle_info = lh_info["handle"]
+            # Create a pattern to match .npz files for the current object_name
+            pattern = str(pcl_dir / f"{object_name}_*.npz")
+            matching_files = glob(pattern)
+            for file in matching_files:
+                file_args_list.append((file, current_directory, dataset_dir, data_dir, link_info, handle_info, object_name))
+
+        # Use partial to create a function with fixed arguments
+        partial_process_file = partial(process_file)
+
+        # Map the function to the list of file arguments using multiprocessing
+        pool.map(partial_process_file, file_args_list)
+
+        # Close the pool and wait for the worker processes to finish
+        pool.close()
+        pool.join()
+        elapsed_time = time.time() - starting_time
+        print("Elapsed time: ", elapsed_time)
+
+    else:
+        for object_name, lh_info in link_handle_info.items():
+            link_info = lh_info["link"]
+            handle_info = lh_info["handle"]
+            # Create a pattern to match .npz files for the current object_name
+            pattern = str(pcl_dir / f"{object_name}_*.npz")
+            matching_files = glob(pattern)
+            for file in tqdm(matching_files):
+                # Extract the scale and joint state from the file name
+                scale = float(file.split("_")[1])
+                joint_state = float(file.split("_")[2][:-4])
+                # TODO: Remove the hardcoded scale, joint_state, object_name
+                object_name = "7128"
+                scale = 0.3
+                joint_state = 1.4240411793732415
+                # Run the precomputed_main function
+                precomputed_main(str(current_directory), str(dataset_dir), data_dir, link_info, handle_info, object_name, 
+                                scale, joint_state, 500, rot_sample_mode="nope")
