@@ -1,18 +1,52 @@
 {
-    "7128": {
-        "link": "right",
-        "handle": "none"
-    },
     "7221": {
         "link": "right",
-        "handle": "vertical"
-    },
-    "7236": {
-        "link": "right",
-        "handle": "none"
+        "handle": "vertical",
+        "cat": "Microwave"
     },
     "7310": {
         "link": "right",
-        "handle": "vertical"
+        "handle": "vertical",
+        "cat": "Microwave"
+    },
+    "7119": {
+        "link": "right",
+        "handle": "none",
+        "cat": "Microwave"
+    },
+    "7263": {
+        "link": "right",
+        "handle": "vertical",
+        "cat": "Microwave"
+    },
+    "7236": {
+        "link": "right",
+        "handle": "none",
+        "cat": "Microwave"
+    },
+    "7296": {
+        "link": "right",
+        "handle": "none",
+        "cat": "Microwave"
+    },
+    "101943": {
+        "link": "top",
+        "handle": "horizontal",
+        "cat": "Oven"
+    },
+    "7130": {
+        "link": "top",
+        "handle": "horizontal",
+        "cat": "Oven"
+    },
+    "7138": {
+        "link": "top",
+        "handle": "horizontal",
+        "cat": "Oven"
+    },
+    "7290": {
+        "link": "top",
+        "handle": "horizontal",
+        "cat": "Oven"
     }
 }

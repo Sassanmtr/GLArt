@@ -75,34 +75,6 @@ def load_urdf_meshes(obj, urdf_file_path, scale, joint_state, only_articulated=F
         for filename in value:
             corres_meshes.append(filename)
 
-    # # Visualization
-    # import pyrender
-    # scene = pyrender.Scene()
-    # # Define the length of the axes
-    # axis_length = 1
-
-    # # Define the colors for the axes (R, G, B)
-    # x_color = [1.0, 0.0, 0.0]  # Red for X-axis
-    # y_color = [0.0, 1.0, 0.0]  # Green for Y-axis
-    # z_color = [0.0, 0.0, 1.0]  # Blue for Z-axis
-
-    # num_points = 100
-    # # Create points for lines along each axis
-    # x_points = np.array([[i * axis_length / num_points, 0, 0] for i in range(num_points)])
-    # y_points = np.array([[0, i * axis_length / num_points, 0] for i in range(num_points)])
-    # z_points = np.array([[0, 0, i * axis_length / num_points] for i in range(num_points)])
-
-    # # Create mesh objects for the lines
-    # for i in range(num_points - 1):
-    #     x_segment = pyrender.Mesh.from_points(x_points[i:i+2], colors=np.tile(x_color, (2, 1)))
-    #     y_segment = pyrender.Mesh.from_points(y_points[i:i+2], colors=np.tile(y_color, (2, 1)))
-    #     z_segment = pyrender.Mesh.from_points(z_points[i:i+2], colors=np.tile(z_color, (2, 1)))
-        
-    #     # Add the line segments to the scene
-    #     scene.add(x_segment)
-    #     scene.add(y_segment)
-    #     scene.add(z_segment)
-
     rx = np.deg2rad(-90)  # Rotate 90 degrees around X-axis
     ry = np.deg2rad(90)  # Rotate 90 degrees around Y-axis
 
@@ -133,17 +105,9 @@ def load_urdf_meshes(obj, urdf_file_path, scale, joint_state, only_articulated=F
             scale_mat[3, 3] = 1.0
             mesh.apply_transform(scale_mat @ internal_transformed @ pose['pose'])  
             transformed_meshes.append(mesh)
-        # mesh = pyrender.Mesh.from_trimesh(mesh, smooth=False)
-        # scene.add(mesh)#, pose=pose['pose'])
- 
-    # pyrender.Viewer(scene, use_raymond_lighting=True)
 
     return transformed_meshes
 
-# urdf_file_path = '/home/mokhtars/Documents/Thesis/datasets/others/CatData/Microwave/7310/mobility.urdf'
-# obj = FileParser("/home/mokhtars/Documents/articulatedobjectsgraspsampling/", "7221")
-# urdf_file_path = '/home/mokhtars/Documents/articulatedobjectsgraspsampling/7221/mobility.urdf'
-# load_urdf_meshes(obj, urdf_file_path=urdf_file_path, scale=0.5, joint_state=0.3, only_articulated=False)
 
 def get_meshes(obj, scale, only_articulated = False):
     """
@@ -306,7 +270,6 @@ def get_balanced_pointcloud(data_dir, obj_id, scale, joint_state, number_of_poin
     combined_points = pc.points
     combined_normals = pc.normals
     for _ in range((number_of_points // 100000)-1): #this is done because the sampling time is exponential so we just always run it for 100k and then add the points
-
         samp = Sampling(data_dir, obj_id, scale, joint_state, 100000)
         pc = samp.create_balanced_cloud(ratio)
         combined_points = np.vstack((combined_points, pc.points))
@@ -375,7 +338,7 @@ class Sampling:
         Returns:
         List of indices of nearest points.
         """
-        # print("point", point)
+        print("point", point)
         [k, idx, _] = self.pcd_tree.search_radius_vector_3d(self.pcd_cuda.points[point], radius)
         if len(idx) < number_of_nearest_points:
             return list(idx)
@@ -686,32 +649,23 @@ class Sampling:
         A new point cloud containing the balanced set of points.
         """
         articulated_points = self.get_articulated_points()
-
-        unarticulated_points = get_inverse(self.pcd_cuda.points, articulated_points)
+        # unarticulated_points = get_inverse(self.pcd_cuda.points, articulated_points)
         antipodal_points = self.get_edges(articulated_points)
 
         # Calculate the number of points to select from each category
-        total_points = len(unarticulated_points) + len(articulated_points)
-        num_antipodal = len(antipodal_points)
+        # num_antipodal = len(antipodal_points)
 
         # Calculate remaining points and ratios
-        num_unarticulated = round(ratio[0] * num_antipodal)
-        num_articulated = round(ratio[1] * num_antipodal)
+        # num_unarticulated = round(ratio[0] * num_antipodal)
+        # num_articulated = round(ratio[1] * num_antipodal)
         # Randomly select points from each category
-        selected_unarticulated = random.sample(list(unarticulated_points), num_unarticulated)
-        # if num_unarticulated > len(list(unarticulated_points)):
-        #     selected_unarticulated = random.sample(list(unarticulated_points), len(list(unarticulated_points)))
-        #     selected_articulated = random.sample(list(articulated_points), len(list(articulated_points)))
-        # else:
-        #     selected_unarticulated = random.sample(list(unarticulated_points), num_unarticulated)
-        #     selected_articulated = random.sample(list(articulated_points), num_articulated)
-        selected_articulated = random.sample(list(articulated_points), num_articulated)
+        # selected_unarticulated = random.sample(list(unarticulated_points), num_unarticulated)
+        # selected_articulated = random.sample(list(articulated_points), num_articulated)
         # print("selected articulated", len(selected_articulated))
-
+        selected_unarticulated = []
+        selected_articulated = []
         # Combine the selected points into a new point cloud
         new_points = np.concatenate([selected_unarticulated, selected_articulated, list(antipodal_points)])
-        # print("new points", len(new_points), new_points)
-
         new_points = list(map(int, new_points))
         new_point_cloud = o3d.geometry.PointCloud()
         new_points_positions = np.asarray(self.pcd_cuda.points)[new_points]

@@ -17,7 +17,8 @@ def load_gripper(assets_dir, startPosition, start_orientation_quaternion) -> Non
     Returns:
     - Gripper: An instance of the Gripper class.
     """
-    urdf_path = os.path.join(assets_dir, "panda_gripper.urdf")
+    # urdf_path = os.path.join(assets_dir, "panda_gripper.urdf")
+    urdf_path = os.path.join(assets_dir, "hand.urdf")
     gripperID = p.loadURDF(urdf_path, startPosition, start_orientation_quaternion,useFixedBase=False, globalScaling = 1.0) #scale important parameter
 
     p.resetJointState(0, 0, 0.04)
@@ -32,7 +33,7 @@ def load_gripper(assets_dir, startPosition, start_orientation_quaternion) -> Non
         gripperID, 
         -1, 
         # lateralFriction=friction, 
-        # mass=5,
+        # mass=100,
         # restitution=resti,
         )
     dyn_info = p.getDynamicsInfo(gripperID, -1)
@@ -42,11 +43,12 @@ def load_gripper(assets_dir, startPosition, start_orientation_quaternion) -> Non
         p.changeDynamics(
             gripperID, 
             joints, 
-            # restitution=resti,
             lateralFriction=7,
-            # spinningFriction=spinning_friction,
-            mass=2,
+            # contactDamping=-0.5,
+            # contactStiffness=-0.5,
+            mass=4,
             )
+        dyn_info = p.getDynamicsInfo(gripperID, joints)
 
     gripper = Gripper(gripperID)
 
@@ -91,10 +93,6 @@ def load_obj(data_dir, object_number, center_of_object, scale, joint_state):
                        basePosition=
                        [0, 0,  0], 
                        baseOrientation=[0,0,0,1]) #[-center_of_object[2],-center_of_object[0],center_of_object[1]] [-0.01255009, 0.14543785,  -0.23111956], 
-    # print(p.getLinkState(objID, 0))
-    # lateral_friction = param_config['ObjectLateralFriction']
-    # object_mass = param_config["ObjectMass"]
-    # spinning_friction = param_config["ObjectSpinningFriction"]
 
     
     joints = range(p.getNumJoints(objID))
@@ -127,13 +125,13 @@ def load_obj(data_dir, object_number, center_of_object, scale, joint_state):
         dyn_info = p.getDynamicsInfo(objID, joint)
         # print("dyn_info before", dyn_info)
         p.changeDynamics(objID, joint,
-                        # lateralFriction=lateral_friction, 
-                        mass = scale,
+                        # lateralFriction=0.5, 
+                        mass = 0.3,
                         # spinningFriction=spinning_friction,
                         )
 
         dyn_info = p.getDynamicsInfo(objID, joint)
-        # print("dyn_info", dyn_info)
+        print("dyn_info", dyn_info)
     return objID
 
 def visualize_points_loader(points, orientation):

@@ -1,30 +1,180 @@
 {
-    "7128": {
-        "link": "right",
-        "handle": "none"
-    },
     "7221": {
         "link": "right",
-        "handle": "vertical"
-    },
-    "7236": {
-        "link": "right",
-        "handle": "none"
-    },
-    "7292": {
-        "link": "top",
-        "handle": "none"
-    },
-    "7304": {
-        "link": "right",
-        "handle": "none"
+        "handle": "vertical",
+        "cat": "Microwave"
     },
     "7310": {
         "link": "right",
+        "handle": "vertical",
+        "cat": "Microwave"
+    },
+    "7119": {
+        "link": "right",
+        "handle": "none",
+        "cat": "Microwave"
+    },
+    "7263": {
+        "link": "right",
+        "handle": "vertical",
+        "cat": "Microwave"
+    },
+    "7236": {
+        "link": "right",
+        "handle": "none",
+        "cat": "Microwave"
+    },
+    "7296": {
+        "link": "right",
+        "handle": "none",
+        "cat": "Microwave"
+    },
+    "101943": {
+        "link": "top",
+        "handle": "horizontal",
+        "cat": "Oven"
+    },
+    "7130": {
+        "link": "top",
+        "handle": "horizontal",
+        "cat": "Oven"
+    },
+    "7138": {
+        "link": "top",
+        "handle": "horizontal",
+        "cat": "Oven"
+    },
+    "7290": {
+        "link": "top",
+        "handle": "horizontal",
+        "cat": "Oven"
+    },
+    "10144": {
+        "link": "left",
+        "handle": "none"
+    },
+    "11211": {
+        "link": "left",
         "handle": "vertical"
     },
-    "7306": {
-        "link": "top",
+    "11260": {
+        "link": "left",
         "handle": "none"
+    },
+    "12249": {
+        "link": "left",
+        "handle": "none"
+    },
+    "12252": {
+        "link": "left",
+        "handle": "vertical"
+    },
+    "11887": {
+        "link": "top",
+        "handle": "none",
+        "cat": "Dishwasher"
+    },
+    "12092": {
+        "link": "top",
+        "handle": "horizontal",
+        "cat": "Dishwasher"
+    },
+    "12259": {
+        "link": "top",
+        "handle": "horizontal",
+        "cat": "Dishwasher"
+    },
+    "12542": {
+        "link": "top",
+        "handle": "none",
+        "cat": "Dishwasher"
+    },
+    "12560": {
+        "link": "top",
+        "handle": "none",
+        "cat": "Dishwasher"
+    },
+    "12565": {
+        "link": "top",
+        "handle": "none",
+        "cat": "Dishwasher"
+    },
+    "12587": {
+        "link": "top",
+        "handle": "none",
+        "cat": "Dishwasher"
+    },
+    "12614": {
+        "link": "top",
+        "handle": "horizontal",
+        "cat": "Dishwasher"
+    },
+    "12621": {
+        "link": "top",
+        "handle": "none",
+        "cat": "Dishwasher"
+    },
+    "12654": {
+        "link": "top",
+        "handle": "none",
+        "cat": "Dishwasher"
+    },
+    "41452": {
+        "link": "bottom",
+        "handle": "none",
+        "category": "StorageFurniture"
+    },
+    "45087": {
+        "link": "right",
+        "handle": "none",
+        "category": "StorageFurniture"
+    },
+    "45162": {
+        "link": "left",
+        "handle": "none",
+        "category": "StorageFurniture"
+    },
+    "45267": {
+        "link": "left",
+        "handle": "horizontal",
+        "category": "StorageFurniture",
+        "up": "True"
+    },
+    "45297": {
+        "link": "right",
+        "handle": "none",
+        "category": "StorageFurniture"
+    },
+    "45448": {
+        "link": "right",
+        "handle": "none",
+        "category": "StorageFurniture"
+    },
+    "45524": {
+        "link": "left",
+        "handle": "none",
+        "category": "StorageFurniture",
+        "up": "True"
+    },
+    "45575": {
+        "link": "right",
+        "handle": "none",
+        "category": "StorageFurniture"
+    },
+    "45600": {
+        "link": "right",
+        "handle": "none",
+        "category": "StorageFurniture"
+    },
+    "45606": {
+        "link": "right",
+        "handle": "none",
+        "category": "StorageFurniture",
+        "up": "True"
+    },
+    "45691": {
+        "link": "right",
+        "handle": "none",
+        "category": "StorageFurniture"
     }
 }

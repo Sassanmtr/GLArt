@@ -152,7 +152,9 @@ def create_gripper_marker(
 
 def create_markers(transform, color, tube_radius=0.002, axis_frame: bool = True):
     original_transform = transform.copy()
-    original_transform[:3, 3] -= 0.075 * transform[:3, 2]
+    # original_transform[:3, 3] -= 0.075 * transform[:3, 2]
+    original_transform[:3, 3] -= 0.15 * transform[:3, 2]
+    # original_transform[:3, 3] -= 0.9034* transform[:3, 2]
     position_marker = trimesh.creation.axis(transform=transform, origin_size=0.002)  # type: ignore
     stick_marker = create_gripper_marker(color, tube_radius=tube_radius)  # type: ignore
     stick_marker.apply_transform(original_transform)  # type: ignore

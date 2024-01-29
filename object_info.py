@@ -117,7 +117,7 @@ class Object:
         Returns:
         - bool: True if the object reached its maximum state, False otherwise.
         """
-        close_error_margin = error_margin + 0.52
+        close_error_margin = error_margin + 0.6
         if open:
             return p.getJointState(self.object_id, self.interaction_joint_link_index)[0] >= self.min_max_joint_position[1] - error_margin
         if open == False:

@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import time
+import random
 import json
 import numpy as np
 import gc
@@ -16,15 +17,19 @@ from loader import load_assets
 from sim_env import setup_env, setup_physics_client
 from helper import quaternion_from_vectors, calc_forward_vec, change_quaternion_format_to_xyz_w, give_quaternion_roll, create_transformation_matrix
 
+# fix the seed for HPO
+random.seed(42)
+np.random.seed(42)
 
-def run(data_dir, assets_dir, gripper_start_position, gripper_start_orientation, object_number, center_of_object, balanced_cloud, scale, joint_state):
+def run(data_dir, assets_dir, point, gripper_start_position, gripper_start_orientation, object_number, center_of_object, balanced_cloud, scale, joint_state):
     setup_env(start_position_camera = gripper_start_position)
 
     gripper, object_id = load_assets(data_dir, assets_dir, gripper_start_position, gripper_start_orientation, object_number, center_of_object, balanced_cloud, scale, joint_state)
-     
-    result = run_simulation(gripper, object_id, steps = 6000000, sleep = 1/1000)
-
-    return result
+    try:
+        result = run_simulation(point, gripper_start_position, gripper_start_orientation, gripper, object_id, steps = 6000000, sleep = 1/1000)
+        return result
+    except:
+        return gripper_start_position, "Fail"
 
 def trans_mat_creator(point, quaternion):
     rotation = Rotation.from_quat(quaternion)
@@ -142,7 +147,6 @@ def grasp_orientation_sampler(valid_orientations):
 def precomputed_main(assets_dir, dataset_dir, data_dir, link_info, handle_info, object_name, 
                      scale, joint_state, grasp_limit, rot_sample_mode="nope"):
     setup_physics_client()
-    # joint_state = 1.5707963267948966 hardcoded for debugging
     pointcloud_path = os.path.join(dataset_dir, "pointclouds", f"{object_name}_{scale}_{joint_state}.npz")
     success_poses = []
     # Load the data from the .npz file
@@ -170,29 +174,36 @@ def precomputed_main(assets_dir, dataset_dir, data_dir, link_info, handle_info, 
             gripper_start_orientation = grasp_orientation_sampler(valid_orientations)
         gripper_start_position = calc_forward_vec(point, gripper_start_orientation, -0.12)
 
-        result = run(data_dir, assets_dir, gripper_start_position, gripper_start_orientation, object_name, center_of_object, point, scale, joint_state)
+        result = run(data_dir, assets_dir, point, gripper_start_position, gripper_start_orientation, object_name, center_of_object, point, scale, joint_state)
         p.resetSimulation()
         print("RESULTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT: ", result)
         if result == "Success" :#or result == "Partial success"
-            # points_success.append(point_index)
             selected_pose = trans_mat_creator(point, gripper_start_orientation)
             success_poses.append(selected_pose)
             success_count += 1
-            print("Number of successful grasps: ", success_count)
+            print("Successful grasps: ", success_count, "out of: ", episode+1)
+            print()
         gc.collect()
         if success_count == grasp_limit:
             break
-       
+    
     success_grasps = np.array(success_poses)
     grasp_path = os.path.join(dataset_dir, "grasps", f"{object_name}_{scale}_{joint_state}.npy")
     np.save(grasp_path, success_grasps)
+    print()
 
 
-
+def list_all_paths(directory):
+    all_paths = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            file_path = os.path.join(root, file)
+            all_paths.append(file_path)
+    return all_paths
 
 
 if __name__ == "__main__":
-    # ## Initialize the PyBullet GUI mode and configure the visualizer
+    ## Initialize the PyBullet GUI mode and configure the visualizer
     p.connect(p.GUI)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
@@ -201,6 +212,7 @@ if __name__ == "__main__":
     starting_time = time.time()
     current_directory = Path.cwd()
     dataset_dir = current_directory / 'datasets'
+    franka_dir = dataset_dir / 'franka'
     pcl_dir = dataset_dir / 'pointclouds'
     save_directory = str(dataset_dir / 'grasps')
     data_dir = str(current_directory / 'DataGenObj/')
@@ -210,13 +222,14 @@ if __name__ == "__main__":
         link_handle_info = json.load(f)
     
     # Run the precomputed_main function
+
     if multiproc:
         # Create a pool of worker processes
         def process_file(args):
             file, current_directory, dataset_dir, data_dir, link_info, handle_info, object_name = args
             scale = float(file.split("_")[1])
             joint_state = float(file.split("_")[2][:-4])
-            precomputed_main(str(current_directory), str(dataset_dir), data_dir, link_info, handle_info, object_name, 
+            precomputed_main(str(franka_dir), str(dataset_dir), data_dir, link_info, handle_info, object_name, 
                             scale, joint_state, 500, rot_sample_mode="nope")
             
         num_processes = multiprocessing.cpu_count()  
@@ -224,6 +237,7 @@ if __name__ == "__main__":
 
         # Create a list of arguments for each file and object
         file_args_list = []
+        paths_list = list_all_paths(save_directory)
         for object_name, lh_info in link_handle_info.items():
             link_info = lh_info["link"]
             handle_info = lh_info["handle"]
@@ -231,7 +245,8 @@ if __name__ == "__main__":
             pattern = str(pcl_dir / f"{object_name}_*.npz")
             matching_files = glob(pattern)
             for file in matching_files:
-                file_args_list.append((file, current_directory, dataset_dir, data_dir, link_info, handle_info, object_name))
+                if file not in paths_list: # If the file has not been processed yet
+                    file_args_list.append((file, current_directory, dataset_dir, data_dir, link_info, handle_info, object_name))
 
         # Use partial to create a function with fixed arguments
         partial_process_file = partial(process_file)
@@ -257,9 +272,14 @@ if __name__ == "__main__":
                 scale = float(file.split("_")[1])
                 joint_state = float(file.split("_")[2][:-4])
                 # TODO: Remove the hardcoded scale, joint_state, object_name
-                object_name = "7128"
-                scale = 0.3
-                joint_state = 1.4240411793732415
-                # Run the precomputed_main function
-                precomputed_main(str(current_directory), str(dataset_dir), data_dir, link_info, handle_info, object_name, 
+                # if scale != 0.43 or joint_state != 0.6981317007977318 or object_name != "7130":
+                # if scale != 0.4 or joint_state != 0.6981317007977318 or object_name != "7310":
+                if scale != 0.4 or joint_state != 0.0 or object_name != "7310":
+                # if object_name != "7119":
+                    # 0.6981317007977318
+                    continue
+                # # If the file does not exist, Run the precomputed_main function
+                # if os.path.isfile(os.path.join(save_directory, f'{object_name}_{scale}_{joint_state}.npy')):
+                #         continue
+                precomputed_main(str(franka_dir), str(dataset_dir), data_dir, link_info, handle_info, object_name, 
                                 scale, joint_state, 500, rot_sample_mode="nope")

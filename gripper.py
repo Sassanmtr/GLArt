@@ -59,7 +59,7 @@ class Gripper:
         - The position of the gripper's grasping point.
         """
         base_position, base_orientation = p.getBasePositionAndOrientation(self.gripper_id)
-        base_to_grip = calc_forward_vec(base_position, base_orientation, 0.1)
+        base_to_grip = calc_forward_vec(base_position, base_orientation, 0.10)
         return base_to_grip
     
 

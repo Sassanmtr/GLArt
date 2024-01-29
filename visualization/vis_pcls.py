@@ -9,14 +9,13 @@ pcl_dir = str(base_dir / "datasets" / "pointclouds")
 files = os.listdir(pcl_dir)
 files.sort()
 for file in files:
-    # if ends with .npy
-    if file.endswith(".npz"):
+    if file.endswith(".npz"): #and "11211" in file:
         # get the object name
         object_name = file.split("_")[0]
         scale = float(file.split("_")[1])
         joint_state = file.split("_")[2][:-4]
         print(
-            "Object name: ", object_name, "Scale: ", scale, "Jointstate: ", joint_state
+            "Object name: ", object_name, "Scale: ", scale, "Joint state: ", joint_state
         )
         pcl_path = os.path.join(pcl_dir, file)
         # load pointclouds and generate pointcloud
@@ -27,4 +26,5 @@ for file in files:
             )
         vis = RerunViewer()
         vis.add_pointcloud("pcd", pc_points, radii=0.002)
-        input("Press enter to continue")
+        # input("Press enter to continue")
+        
