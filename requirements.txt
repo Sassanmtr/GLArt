@@ -1,0 +1,11 @@
+numpy
+pybullet
+scipy
+open3d
+trimesh
+pyglet
+Rtree
+rerun
+tqdm
+git+https://github.com/chisarie/urdfpy
+git+ssh://git@github.com/chisarie/mesh_to_sdf#egg=mesh_to_sdf
